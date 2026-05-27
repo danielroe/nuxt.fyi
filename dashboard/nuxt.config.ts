@@ -1,3 +1,10 @@
+// `NUXT_UI_ONLY=1 nuxt dev` proxies every `/api/**` request to the deployed dashboard
+// (override the target with `NUXT_UI_ONLY_TARGET`) so UI work doesn't need a populated
+// local SQLite database. The flag is read once at config-eval time, so it only takes
+// effect for the dev session it started.
+const uiOnly = !!process.env.NUXT_UI_ONLY
+const uiOnlyTarget = process.env.NUXT_UI_ONLY_TARGET || 'https://nuxt.fyi'
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-01-01',
   devtools: { enabled: true },
@@ -24,9 +31,18 @@ export default defineNuxtConfig({
     '/hits/**': { swr: 300 },
     '/recent': { swr: 1 },
     '/recent/**': { swr: 1 },
-    '/api/stats': { swr: 1 },
-    '/api/hits/**': { swr: 300 },
-    '/api/screenshots/**': { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800' } },
+    ...(uiOnly
+      ? {
+          // Wildcard alone wins because we omit the more-specific local-cache rules
+          // below; otherwise Nitro's radix matcher prefers them and the local handler
+          // still runs.
+          '/api/**': { proxy: `${uiOnlyTarget}/api/**`, swr: false },
+        }
+      : {
+          '/api/stats': { swr: 1 },
+          '/api/hits/**': { swr: 300 },
+          '/api/screenshots/**': { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800' } },
+        }),
   },
   app: {
     head: {

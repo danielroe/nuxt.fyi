@@ -9,6 +9,7 @@
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
+    "dev:ui-only": "NUXT_UI_ONLY=1 NODE_OPTIONS=\"${NODE_OPTIONS:-} --use-env-proxy\" nuxt dev",
     "postinstall": "nuxt prepare",
     "preview": "node .output/server/index.mjs",
     "test:types": "nuxt typecheck"
@@ -17,7 +18,6 @@
     "nuxt": "^4.4.6",
     "unstorage": "^1.17.5",
     "vue": "^3.5.0",
-    "vue-data-ui": "^3.20.10",
     "vue-router": "^5.0.7"
   },
   "devDependencies": {

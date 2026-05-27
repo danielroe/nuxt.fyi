@@ -1,12 +1,4 @@
 <script setup lang="ts">
-// Async-loaded so vue-data-ui's module-scope side effects (CSS injection, globals) don't
-// run during SSR and trigger a hydration mismatch on the client re-render.
-const VueUiXy = defineAsyncComponent(async () => {
-  const mod = await import('vue-data-ui')
-  await import('vue-data-ui/style.css')
-  return mod.VueUiXy
-})
-
 interface VersionRow {
   version: string
   count: number
@@ -17,11 +9,6 @@ const props = defineProps<{
   versions: VersionRow[]
 }>()
 
-// Only npm-published versions are plotted; off-registry strings and unknown rows live in
-// the sidebar so every chart bar is something you can `npm install`.
-const chartedVersions = computed(() => props.versions.filter(v => v.bucket === 'published'))
-
-// One bar per major.minor; sorted strictly ascending so the x-axis reads oldest -> newest.
 interface MinorBucket {
   label: string
   major: number
@@ -66,69 +53,127 @@ function bucketByMinor(versions: VersionRow[]): MinorBucket[] {
   })
 }
 
-const buckets = computed(() => bucketByMinor(chartedVersions.value))
+const buckets = computed(() =>
+  bucketByMinor(props.versions.filter(v => v.bucket === 'published')),
+)
 
-const dataset = computed(() => [{
-  type: 'bar' as const,
-  name: 'sites',
-  series: buckets.value.map(b => b.count),
-  color: '#00dc82',
-}])
+const WIDTH = 720
+const HEIGHT = 360
+const PADDING = { top: 18, right: 12, bottom: 32, left: 44 }
+const BAR_GAP = 4
 
-const config = computed(() => ({
-  responsive: true,
-  chart: {
-    // chart.userOptions (PDF/CSV/PNG export menu) is per-component; for VueUiXy it nests
-    // here, not at the top level of the config.
-    userOptions: { show: false },
-    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-    backgroundColor: 'transparent',
-    color: '#e5e5e5',
-    legend: { show: false },
-    title: { show: false },
-    tooltip: {
-      backgroundColor: '#0a0a0a',
-      color: '#e5e5e5',
-      borderColor: '#222',
-      // Single-series chart: each bar's percentage is always 100% of itself.
-      showPercentage: false,
-    },
-    grid: {
-      stroke: '#222',
-      labels: {
-        color: '#888',
-        xAxisLabels: {
-          color: '#888',
-          show: true,
-          values: buckets.value.map(b => b.label),
-          rotation: 0,
-        },
-        yAxis: {
-          showBaseline: true,
-          useNiceScale: true,
-          scaleMin: 0,
-        },
-      },
-    },
-    highlighter: { color: '#e5e5e5', opacity: 5 },
-    zoom: { show: false },
-  },
-}))
+/**
+ * Round `max` up to a friendly axis ceiling (1, 2, 2.5, 5 * 10^n) so tick labels read
+ * as round numbers rather than the raw data max.
+ */
+function niceCeil(max: number): number {
+  if (max <= 0) return 1
+  const exp = Math.floor(Math.log10(max))
+  const pow = 10 ** exp
+  const norm = max / pow
+  const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10
+  return nice * pow
+}
+
+function fmtTick(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1)}k`
+  return String(n)
+}
+
+const layout = computed(() => {
+  const items = buckets.value
+  const plotW = WIDTH - PADDING.left - PADDING.right
+  const plotH = HEIGHT - PADDING.top - PADDING.bottom
+  const n = items.length
+  const barW = n > 0 ? (plotW - BAR_GAP * Math.max(0, n - 1)) / n : 0
+  const dataMax = items.reduce((m, b) => Math.max(m, b.count), 0)
+  const yMax = niceCeil(dataMax)
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => ({
+    value: yMax * t,
+    y: PADDING.top + plotH * (1 - t),
+  }))
+  const bars = items.map((b, i) => {
+    const h = yMax > 0 ? (b.count / yMax) * plotH : 0
+    return {
+      ...b,
+      x: PADDING.left + i * (barW + BAR_GAP),
+      y: PADDING.top + plotH - h,
+      w: barW,
+      h,
+      cx: PADDING.left + i * (barW + BAR_GAP) + barW / 2,
+      labelY: HEIGHT - PADDING.bottom + 14,
+    }
+  })
+  return {
+    bars,
+    ticks,
+    baselineY: PADDING.top + plotH,
+    plotLeft: PADDING.left,
+    plotRight: WIDTH - PADDING.right,
+  }
+})
 </script>
 
 <template>
   <div class="version-chart">
-    <!-- The third-party VueUiXy chart renders interactive SVG with no usable accessible
-         name or text alternative. We hide it from assistive tech and expose the same
-         numbers via a visually-hidden data table that mirrors the bar buckets. -->
-    <div aria-hidden="true" class="chart-visual">
-      <ClientOnly>
-        <VueUiXy :dataset="(dataset as never)" :config="(config as never)" />
-        <template #fallback>
-          <ChartSkeleton :bar-count="buckets.length || 20" />
-        </template>
-      </ClientOnly>
-    </div>
+    <svg
+      :viewBox="`0 0 ${WIDTH} ${HEIGHT}`"
+      preserveAspectRatio="xMidYMid meet"
+      role="img"
+      aria-label="Nuxt versions detected, grouped by major.minor. See data table below."
+    >
+      <g class="grid">
+        <line
+          v-for="(t, i) in layout.ticks"
+          :key="`grid-${i}`"
+          :x1="layout.plotLeft"
+          :y1="t.y"
+          :x2="layout.plotRight"
+          :y2="t.y"
+        />
+      </g>
+      <g class="y-axis">
+        <text
+          v-for="(t, i) in layout.ticks"
+          :key="`y-${i}`"
+          :x="layout.plotLeft - 8"
+          :y="t.y"
+          text-anchor="end"
+          dominant-baseline="middle"
+        >{{ fmtTick(t.value) }}</text>
+      </g>
+      <g class="bars">
+        <g v-for="b in layout.bars" :key="b.label" class="bar">
+          <rect
+            :x="b.x"
+            :y="b.y"
+            :width="b.w"
+            :height="b.h"
+            rx="1"
+          >
+            <title>{{ b.label }}: {{ b.count.toLocaleString() }}</title>
+          </rect>
+        </g>
+      </g>
+      <line
+        class="baseline"
+        :x1="layout.plotLeft"
+        :y1="layout.baselineY"
+        :x2="layout.plotRight"
+        :y2="layout.baselineY"
+      />
+      <g class="x-axis">
+        <text
+          v-for="b in layout.bars"
+          :key="`x-${b.label}`"
+          :x="b.cx"
+          :y="b.labelY"
+          text-anchor="middle"
+          dominant-baseline="hanging"
+        >{{ b.label }}</text>
+      </g>
+    </svg>
     <table class="sr-only">
       <caption>Nuxt sites grouped by detected major.minor version</caption>
       <thead>
@@ -148,13 +193,35 @@ const config = computed(() => ({
 </template>
 
 <style scoped>
-/* Fixed container height keeps the SSR reservation and the post-hydration chart aligned;
-   without it the library mounts at its default size and reflows everything below. */
-.version-chart { margin: 1rem 0; height: 360px; position: relative; }
-.chart-visual { height: 100%; }
-.version-chart :deep(.vue-ui-xy),
-.version-chart :deep(.vue-data-ui-component) { height: 100% !important; }
-.version-chart :deep(.vue-ui-xy),
-.version-chart :deep(svg) { background: transparent !important; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.version-chart {
+  margin: 1rem 0;
+  width: 100%;
+}
+.version-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+.version-chart .grid line {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.version-chart .baseline {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.version-chart .y-axis text,
+.version-chart .x-axis text {
+  fill: var(--muted);
+}
+.version-chart .bars rect {
+  fill: var(--accent);
+  transition: opacity 120ms ease;
+}
+.version-chart .bars .bar:hover rect {
+  opacity: 0.75;
+}
 </style>
