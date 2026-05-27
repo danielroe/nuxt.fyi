@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
-import { fmtAge } from '~/composables/format'
 
 const SORTS = ['scanned_at', 'rank', 'seen_count', 'confidence'] as const
 const ORDERS = ['asc', 'desc'] as const
@@ -110,7 +109,7 @@ function detailPath(domain: string): RouteLocationRaw {
                 <span class="sr-only">Tranco rank </span>#{{ hit.rank.toLocaleString() }}
               </span>
               <span class="muted"><span class="sr-only">confidence </span>conf {{ hit.confidence }}</span>
-              <span class="muted"><span class="sr-only">scanned </span>{{ fmtAge(hit.scannedAt) }}</span>
+              <span class="muted"><span class="sr-only">scanned </span><NuxtTime :datetime="hit.scannedAt" relative /></span>
             </div>
           </div>
         </NuxtLink>

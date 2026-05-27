@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
-import { fmtAge } from '~/composables/format'
 
 const FILTERS = ['nuxt-only', 'not-nuxt', 'errored', 'pending'] as const
 const SORTS = ['seen_count', 'first_seen', 'last_seen'] as const
@@ -149,8 +148,8 @@ function ariaSortValue(key: Sort): 'ascending' | 'descending' | 'none' {
             <span v-else class="muted">pending</span>
           </td>
           <td class="num muted">{{ row.seenCount }}</td>
-          <td class="num muted">{{ fmtAge(row.firstSeenAt) }}</td>
-          <td class="num muted">{{ fmtAge(row.lastSeenAt) }}</td>
+          <td class="num muted"><NuxtTime :datetime="row.firstSeenAt" relative /></td>
+          <td class="num muted"><NuxtTime :datetime="row.lastSeenAt" relative /></td>
         </tr>
       </tbody>
     </table>

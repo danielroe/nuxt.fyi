@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { fmtAge, fmtNumber } from '~/composables/format'
+import { fmtNumber } from '~/composables/format'
 
 definePageMeta({ name: 'index' })
 
@@ -39,7 +39,7 @@ const unknownVersions = computed(() =>
     </div>
 
     <p class="muted small">
-      last scan {{ fmtAge(data.stats.lastScanAt) }} &middot;
+      last scan <NuxtTime :datetime="data.stats.lastScanAt" relative /> &middot;
       {{ fmtNumber(data.stats.pendingScan) }} seen but never scanned &middot;
       {{ fmtNumber(data.stats.errors) }} scans errored
     </p>

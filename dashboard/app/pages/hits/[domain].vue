@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
-import { fmtAge, fmtNumber } from '~/composables/format'
+import { fmtNumber } from '~/composables/format'
 
 definePageMeta({ name: 'hits-detail' })
 
@@ -77,7 +77,7 @@ const backTo = computed<RouteLocationRaw>(() => {
 
       <h2>Detection</h2>
       <p class="muted small">
-        confidence {{ data.confidence }} &middot; scanned {{ fmtAge(data.scannedAt) }}
+        confidence {{ data.confidence }} &middot; scanned <NuxtTime :datetime="data.scannedAt" relative />
       </p>
       <ul class="signals">
         <li v-for="sig in data.signals" :key="sig.name">
@@ -89,14 +89,14 @@ const backTo = computed<RouteLocationRaw>(() => {
 
       <h2>Activity</h2>
       <p class="muted small">
-        first seen on Bluesky {{ fmtAge(data.firstSeenAt) }} &middot;
-        last seen {{ fmtAge(data.lastSeenAt) }} &middot;
+        first seen on Bluesky <NuxtTime :datetime="data.firstSeenAt" relative /> &middot;
+        last seen <NuxtTime :datetime="data.lastSeenAt" relative /> &middot;
         mentioned {{ fmtNumber(data.seenCount) }} time<span v-if="data.seenCount !== 1">s</span>
       </p>
       <ul v-if="data.notifications.length" class="notifications">
         <li v-for="n in sortedNotifications" :key="n.channel">
           posted to <strong :class="`channel-${n.channel}`">{{ channelLabel(n.channel) }}</strong>
-          {{ fmtAge(n.postedAt) }}
+          <NuxtTime :datetime="n.postedAt" relative />
         </li>
       </ul>
     </div>
