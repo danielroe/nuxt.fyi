@@ -121,9 +121,6 @@ h1 { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .notifications { list-style: none; padding: 0; }
 .notifications li { padding: 0.25rem 0; color: var(--muted); }
 .notifications strong { color: var(--fg); }
-/* Brand-coloured channel names use lighter tints than the official #5865f2 / #0a7aff so
-   they clear 4.5:1 on the #0a0a0a background. The brand colours themselves only hit ~4:1
-   and ~4.9:1 respectively, which fails or sits at the border of the WCAG AA floor. */
 .notifications strong.channel-discord { color: #8e98f8; }
 .notifications strong.channel-bluesky { color: #4ca3ff; }
 .small { font-size: 0.85rem; }
