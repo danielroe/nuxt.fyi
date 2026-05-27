@@ -9,6 +9,14 @@ const domain = computed(() => route.params.domain)
 
 const { data, error } = await useFetch(() => `/api/hits/${encodeURIComponent(domain.value)}`)
 
+useHead({
+  title: () => {
+    if (error.value) return `Not found — nuxt.fyi`
+    const v = data.value?.version ? ` (v${data.value.version})` : ''
+    return `${domain.value}${v} — nuxt.fyi`
+  },
+})
+
 const CHANNEL_ORDER: Record<string, number> = { discord: 0, bluesky: 1 }
 const CHANNEL_LABELS: Record<string, string> = { discord: 'Discord', bluesky: 'Bluesky' }
 function channelLabel(channel: string): string {
@@ -32,9 +40,9 @@ const backTo = computed<RouteLocationRaw>(() => {
 
 <template>
   <div>
-    <NuxtLink :to="backTo" class="back">&larr; all sites</NuxtLink>
+    <NuxtLink :to="backTo" class="back"><span aria-hidden="true">&larr; </span>all sites</NuxtLink>
 
-    <div v-if="error" class="muted">not found</div>
+    <div v-if="error" role="alert" class="muted">not found</div>
 
     <div v-else-if="data">
       <h1>
@@ -45,7 +53,7 @@ const backTo = computed<RouteLocationRaw>(() => {
       <p v-if="data.title" class="muted">{{ data.title }}</p>
       <p>
         <a :href="data.finalUrl || `https://${data.domain}`" target="_blank" rel="noopener">
-          {{ data.finalUrl || `https://${data.domain}` }}
+          {{ data.finalUrl || `https://${data.domain}` }}<span class="sr-only"> (opens in a new tab)</span>
         </a>
       </p>
       <p v-if="data.redirectedTo" class="redirect-note">
@@ -58,7 +66,7 @@ const backTo = computed<RouteLocationRaw>(() => {
       <div v-if="data.imageUrl" class="screenshot">
         <img
           :src="data.imageUrl"
-          :alt="`${data.domain} preview`"
+          :alt="`Homepage screenshot of ${data.domain}`"
           width="1280"
           height="800"
           fetchpriority="high"
@@ -113,7 +121,10 @@ h1 { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .notifications { list-style: none; padding: 0; }
 .notifications li { padding: 0.25rem 0; color: var(--muted); }
 .notifications strong { color: var(--fg); }
-.notifications strong.channel-discord { color: #5865f2; }
-.notifications strong.channel-bluesky { color: #0a7aff; }
+/* Brand-coloured channel names use lighter tints than the official #5865f2 / #0a7aff so
+   they clear 4.5:1 on the #0a0a0a background. The brand colours themselves only hit ~4:1
+   and ~4.9:1 respectively, which fails or sits at the border of the WCAG AA floor. */
+.notifications strong.channel-discord { color: #8e98f8; }
+.notifications strong.channel-bluesky { color: #4ca3ff; }
 .small { font-size: 0.85rem; }
 </style>

@@ -12,6 +12,6 @@ defineProps<{ domain: string }>()
 </template>
 
 <style scoped>
-.domain-text .prefix { color: var(--muted); opacity: 0.55; }
+.domain-text .prefix { color: var(--muted); }
 .domain-text .rest { color: inherit; }
 </style>

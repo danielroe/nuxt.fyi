@@ -118,12 +118,32 @@ const config = computed(() => ({
 
 <template>
   <div class="version-chart">
-    <ClientOnly>
-      <VueUiXy :dataset="(dataset as never)" :config="(config as never)" />
-      <template #fallback>
-        <ChartSkeleton :bar-count="buckets.length || 20" />
-      </template>
-    </ClientOnly>
+    <!-- The third-party VueUiXy chart renders interactive SVG with no usable accessible
+         name or text alternative. We hide it from assistive tech and expose the same
+         numbers via a visually-hidden data table that mirrors the bar buckets. -->
+    <div aria-hidden="true" class="chart-visual">
+      <ClientOnly>
+        <VueUiXy :dataset="(dataset as never)" :config="(config as never)" />
+        <template #fallback>
+          <ChartSkeleton :bar-count="buckets.length || 20" />
+        </template>
+      </ClientOnly>
+    </div>
+    <table class="sr-only">
+      <caption>Nuxt sites grouped by detected major.minor version</caption>
+      <thead>
+        <tr>
+          <th scope="col">version</th>
+          <th scope="col">sites</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="b in buckets" :key="b.label">
+          <td>{{ b.isUnknown ? 'unknown' : `v${b.label}` }}</td>
+          <td>{{ b.count.toLocaleString() }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
@@ -131,8 +151,10 @@ const config = computed(() => ({
 /* Fixed container height keeps the SSR reservation and the post-hydration chart aligned;
    without it the library mounts at its default size and reflows everything below. */
 .version-chart { margin: 1rem 0; height: 360px; position: relative; }
+.chart-visual { height: 100%; }
 .version-chart :deep(.vue-ui-xy),
 .version-chart :deep(.vue-data-ui-component) { height: 100% !important; }
 .version-chart :deep(.vue-ui-xy),
 .version-chart :deep(svg) { background: transparent !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 </style>

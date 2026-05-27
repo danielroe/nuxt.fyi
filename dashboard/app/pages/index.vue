@@ -3,6 +3,8 @@ import { fmtAge, fmtNumber } from '~/composables/format'
 
 definePageMeta({ name: 'index' })
 
+useHead({ title: 'Overview — nuxt.fyi' })
+
 const { data } = await useFetch('/api/stats')
 
 const offRegistryVersions = computed(() =>
@@ -42,38 +44,56 @@ const unknownVersions = computed(() =>
       {{ fmtNumber(data.stats.errors) }} scans errored
     </p>
 
-    <h2>versions detected</h2>
+    <h2 id="versions-heading">versions detected</h2>
     <div class="versions-layout">
       <div class="versions-chart">
-        <VersionChart :versions="data.versions" />
+        <VersionChart :versions="data.versions" aria-labelledby="versions-heading" />
       </div>
-      <aside class="versions-aside">
-        <h3>off-registry &amp; unknown</h3>
+      <aside class="versions-aside" aria-label="Off-registry and unknown versions">
+        <h3 id="off-registry-heading">off-registry &amp; unknown</h3>
         <p class="muted small">
           versions we couldn't verify against
-          <a href="https://www.npmjs.com/package/nuxt" target="_blank" rel="noopener">npmjs.com</a>,
+          <a href="https://www.npmjs.com/package/nuxt" target="_blank" rel="noopener">
+            npmjs.com<span class="sr-only"> (opens in a new tab)</span></a>,
           or sites where we couldn't detect a version at all.
         </p>
-        <table class="aside-table">
-          <tr v-for="row in offRegistryVersions" :key="row.version">
-            <td>{{ row.version }}</td>
-            <td class="count">{{ fmtNumber(row.count) }}</td>
-          </tr>
-          <tr v-for="row in unknownVersions" :key="`unk-${row.version}`" class="unknown">
-            <td><em>{{ row.version }}</em></td>
-            <td class="count">{{ fmtNumber(row.count) }}</td>
-          </tr>
+        <table class="aside-table" aria-labelledby="off-registry-heading">
+          <thead>
+            <tr>
+              <th scope="col">version</th>
+              <th scope="col" class="count">sites</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in offRegistryVersions" :key="row.version">
+              <td>{{ row.version }}</td>
+              <td class="count">{{ fmtNumber(row.count) }}</td>
+            </tr>
+            <tr v-for="row in unknownVersions" :key="`unk-${row.version}`" class="unknown">
+              <td><span class="sr-only">unverified: </span><em>{{ row.version }}</em></td>
+              <td class="count">{{ fmtNumber(row.count) }}</td>
+            </tr>
+          </tbody>
         </table>
       </aside>
     </div>
 
-    <h2>signals that fired on nuxt hits</h2>
-    <table class="bars">
-      <tr v-for="row in data.signals" :key="row.name">
-        <td class="ver">{{ row.name }}</td>
-        <td class="bar"><div :style="{ width: barWidth(row.count, data.signals[0]?.count ?? 1) }" /></td>
-        <td class="count">{{ fmtNumber(row.count) }}</td>
-      </tr>
+    <h2 id="signals-heading">signals that fired on nuxt hits</h2>
+    <table class="bars" aria-labelledby="signals-heading">
+      <thead class="sr-only">
+        <tr>
+          <th scope="col">signal</th>
+          <th scope="col">relative frequency</th>
+          <th scope="col">count</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="row in data.signals" :key="row.name">
+          <td class="ver">{{ row.name }}</td>
+          <td class="bar" aria-hidden="true"><div :style="{ width: barWidth(row.count, data.signals[0]?.count ?? 1) }" /></td>
+          <td class="count">{{ fmtNumber(row.count) }}</td>
+        </tr>
+      </tbody>
     </table>
   </div>
 </template>

@@ -53,6 +53,14 @@ const { data, pending } = await useFetch('/api/recent', {
   })),
 })
 
+useHead({
+  title: () => {
+    const f = activeFilter.value.label
+    const scope = f === 'all' ? '' : ` (${f})`
+    return `Recent domains${scope} — nuxt.fyi`
+  },
+})
+
 function recentPath(filter: FilterSlug, s: Sort, o: Order): RouteLocationRaw {
   return { name: 'recent', params: { filter, sort: s, order: o } }
 }
@@ -74,6 +82,13 @@ function sortIndicator(key: Sort): string {
   if (sort.value !== key) return ''
   return order.value === 'desc' ? ' \u2193' : ' \u2191'
 }
+
+/** Maps the current sort key + direction to the value of `aria-sort` on the matching
+ *  column header, per the WAI ARIA grid pattern. Inactive columns get `none`. */
+function ariaSortValue(key: Sort): 'ascending' | 'descending' | 'none' {
+  if (sort.value !== key) return 'none'
+  return order.value === 'asc' ? 'ascending' : 'descending'
+}
 </script>
 
 <template>
@@ -83,32 +98,40 @@ function sortIndicator(key: Sort): string {
       every domain we've seen on Bluesky.
     </p>
 
-    <nav class="filters" aria-label="Filter">
+    <nav class="filters" aria-label="Filter domains">
       <span class="filter-label">show:</span>
       <NuxtLink
         v-for="opt in FILTER_OPTIONS"
         :key="opt.value"
         :to="filterPath(opt.slug)"
         :class="['filter-link', { active: activeFilter.value === opt.value }]"
+        :aria-current="activeFilter.value === opt.value ? 'true' : undefined"
       >{{ opt.label }}</NuxtLink>
     </nav>
 
-    <div v-if="pending && !data" class="muted">loading…</div>
+    <div v-if="pending && !data" role="status" aria-live="polite" class="muted">loading…</div>
 
     <table v-if="data" class="rows">
+      <caption class="sr-only">Recent domains observed on Bluesky, filtered by {{ activeFilter.label }}</caption>
       <thead>
         <tr>
-          <th class="domain">domain</th>
-          <th class="status">status</th>
-          <th v-for="key in SORTS" :key="key" class="num">
+          <th scope="col" class="domain">domain</th>
+          <th scope="col" class="status">status</th>
+          <th
+            v-for="key in SORTS"
+            :key="key"
+            scope="col"
+            class="num"
+            :aria-sort="ariaSortValue(key)"
+          >
             <NuxtLink :to="sortPath(key)" class="sort-link">
-              {{ SORT_LABELS[key] }}<span class="sort-indicator">{{ sortIndicator(key) }}</span>
+              {{ SORT_LABELS[key] }}<span class="sort-indicator" aria-hidden="true">{{ sortIndicator(key) }}</span>
             </NuxtLink>
           </th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="row in data.rows" :key="row.domain" :class="{ nuxt: row.isNuxt, errored: !!row.error }">
+        <tr v-for="row in data.rows" :key="row.domain" :class="{ nuxt: row.isNuxt }">
           <td class="domain">
             <NuxtLink v-if="row.isNuxt" :to="detailPath(row.domain)">
               <DomainText :domain="row.domain" />
@@ -116,8 +139,12 @@ function sortIndicator(key: Sort): string {
             <DomainText v-else :domain="row.domain" />
           </td>
           <td class="status">
-            <span v-if="row.isNuxt" class="tag">Nuxt{{ row.version ? ` v${row.version}` : '' }}</span>
-            <span v-else-if="row.error" class="muted error" :title="row.error">error</span>
+            <span v-if="row.isNuxt" class="tag">
+              <span aria-hidden="true">✔</span> Nuxt{{ row.version ? ` v${row.version}` : '' }}
+            </span>
+            <span v-else-if="row.error" class="muted error" :title="row.error">
+              <span aria-hidden="true">⚠</span> error
+            </span>
             <span v-else-if="row.scanned" class="muted">not Nuxt</span>
             <span v-else class="muted">pending</span>
           </td>
@@ -128,7 +155,7 @@ function sortIndicator(key: Sort): string {
       </tbody>
     </table>
 
-    <p v-if="data && data.rows.length === 0" class="muted">no rows match this filter</p>
+    <p v-if="data && data.rows.length === 0" role="status" class="muted">no rows match this filter</p>
   </div>
 </template>
 
