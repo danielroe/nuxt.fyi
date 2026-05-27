@@ -1,0 +1,16 @@
+node_modules
+dashboard/node_modules
+dashboard/.nuxt
+dashboard/.output
+.git
+.github
+.env
+.env.example
+data
+screenshots
+*.log
+*.md
+.gitignore
+.dockerignore
+Dockerfile
+fly.toml

@@ -1,0 +1,13 @@
+node_modules
+.env
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/*.db-*
+screenshots/
+!dashboard/server/api/screenshots
+vendor/
+*.log
+dashboard/.nuxt
+dashboard/.output

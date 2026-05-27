@@ -1,0 +1,53 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r run test:types
+      - run: pnpm test
+      - run: pnpm --filter nuxt-fyi-dashboard build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: nuxt-fyi
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      # Snapshot the data volume before deploying.
+      - name: snapshot data volume
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          vol_id=$(flyctl volumes list -a "$FLY_APP" --json | jq -r '.[] | select(.name == "nuxt_fyi_data") | .id' | head -n1)
+          if [ -z "$vol_id" ]; then
+            echo "no nuxt_fyi_data volume found; skipping snapshot"
+            exit 0
+          fi
+          echo "snapshotting $vol_id"
+          flyctl volumes snapshots create "$vol_id" -a "$FLY_APP"
+
+      - run: flyctl deploy --remote-only

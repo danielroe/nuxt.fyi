@@ -1,0 +1,50 @@
+# Single-machine deployment: daemon + dashboard run side-by-side in one container,
+# sharing one volume.
+
+app = "nuxt-fyi"
+primary_region = "lhr"
+
+[deploy]
+  # `immediate` stops the old machine before starting the new one. Required because we
+  # have one volume and one machine; rolling deploys would deadlock on the volume mount.
+  strategy = "immediate"
+  # Roll back automatically if the new release fails health checks. Stops a bad deploy
+  # from leaving the app in a broken state requiring manual intervention.
+  wait_timeout = "5m"
+
+[build]
+
+[env]
+  JETSTREAM_URL = "wss://jetstream2.us-east.bsky.network/subscribe"
+  SCAN_CONCURRENCY = "2"
+  RESCAN_AFTER_MS = "2592000000"
+  NUXT_DATA_DIR = "/data"
+  NUXT_SCREENSHOT_DIR = "/data/screenshots"
+  SHUTDOWN_DRAIN_MS = "25000"
+  # The dashboard listens on 3000; Fly's [http_service] forwards :443 to it.
+  PORT = "3000"
+  HOST = "0.0.0.0"
+
+# Single persistent volume holds the sqlite db plus screenshots.
+[[mounts]]
+  source = "nuxt_fyi_data"
+  destination = "/data"
+  initial_size = "1gb"
+  auto_extend_size_threshold = 80
+  auto_extend_size_increment = "1GB"
+  auto_extend_size_limit = "5GB"
+
+# The dashboard serves HTTPS via Fly's edge. The daemon is internal-only.
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "4gb"
+
+[[restart]]
+  policy = "always"

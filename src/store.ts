@@ -1,0 +1,166 @@
+import { DatabaseSync } from 'node:sqlite'
+import { mkdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { config } from './config.ts'
+
+mkdirSync(config.dataDir, { recursive: true })
+
+export const DB_PATH = join(config.dataDir, 'nuxt-fyi.db')
+export const db = new DatabaseSync(DB_PATH)
+
+// WAL lets readers and the single writer run concurrently; NORMAL synchronous is the
+// recommended pairing (durable across process crashes, not across power loss).
+db.exec(`
+  PRAGMA journal_mode = WAL;
+  PRAGMA synchronous = NORMAL;
+  PRAGMA busy_timeout = 30000;
+  PRAGMA wal_autocheckpoint = 4000;
+`)
+
+const WAL_TRUNCATE_INTERVAL_MS = 60_000
+function truncateWal(): void {
+  try {
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+  }
+  catch (err) {
+    // Checkpoint failures are non-fatal: the WAL just stays large until the next attempt.
+    console.warn('[store] wal_checkpoint failed:', (err as Error).message)
+  }
+}
+truncateWal()
+const walTimer = setInterval(truncateWal, WAL_TRUNCATE_INTERVAL_MS)
+walTimer.unref()
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS domains (
+    domain        TEXT PRIMARY KEY,
+    first_seen_at INTEGER NOT NULL,
+    last_seen_at  INTEGER NOT NULL,
+    seen_count    INTEGER NOT NULL DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS scans (
+    domain          TEXT PRIMARY KEY,
+    scanned_at      INTEGER NOT NULL,
+    is_nuxt         INTEGER NOT NULL,
+    nuxt_version    TEXT,
+    confidence      INTEGER NOT NULL,
+    signals         TEXT NOT NULL,
+    final_url       TEXT,
+    title           TEXT,
+    screenshot_path TEXT,
+    og_image        TEXT,
+    redirected_to   TEXT,
+    error           TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    domain     TEXT NOT NULL,
+    channel    TEXT NOT NULL,
+    posted_at  INTEGER NOT NULL,
+    PRIMARY KEY (domain, channel)
+  );
+`)
+
+// Idempotent forward migrations for columns added after the first release. SQLite has no
+// ADD COLUMN IF NOT EXISTS, so we swallow the "duplicate column" error.
+for (const ddl of [
+  `ALTER TABLE scans ADD COLUMN og_image TEXT`,
+  `ALTER TABLE scans ADD COLUMN redirected_to TEXT`,
+]) {
+  try { db.exec(ddl) }
+  catch (err) {
+    if (!/duplicate column name/i.test((err as Error).message)) throw err
+  }
+}
+
+const upsertDomainStmt = db.prepare(`
+  INSERT INTO domains (domain, first_seen_at, last_seen_at, seen_count)
+  VALUES (?, ?, ?, 1)
+  ON CONFLICT(domain) DO UPDATE SET
+    last_seen_at = excluded.last_seen_at,
+    seen_count = seen_count + 1
+`)
+
+const getScanStmt = db.prepare(`SELECT * FROM scans WHERE domain = ?`)
+
+const upsertScanStmt = db.prepare(`
+  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(domain) DO UPDATE SET
+    scanned_at = excluded.scanned_at,
+    is_nuxt = excluded.is_nuxt,
+    nuxt_version = excluded.nuxt_version,
+    confidence = excluded.confidence,
+    signals = excluded.signals,
+    final_url = excluded.final_url,
+    title = excluded.title,
+    screenshot_path = excluded.screenshot_path,
+    og_image = excluded.og_image,
+    redirected_to = excluded.redirected_to,
+    error = excluded.error
+`)
+
+const hasNotifiedStmt = db.prepare(`SELECT 1 FROM notifications WHERE domain = ? AND channel = ?`)
+const recordNotificationStmt = db.prepare(`
+  INSERT OR REPLACE INTO notifications (domain, channel, posted_at) VALUES (?, ?, ?)
+`)
+
+export interface ScanRow {
+  domain: string
+  scanned_at: number
+  is_nuxt: number
+  nuxt_version: string | null
+  confidence: number
+  signals: string
+  final_url: string | null
+  title: string | null
+  screenshot_path: string | null
+  og_image: string | null
+  /** Set when the scan target redirected to a different registrable domain; the actual
+   *  Nuxt detection was performed against that destination, not this row's domain. */
+  redirected_to: string | null
+  error: string | null
+}
+
+export function recordDomainSeen(domain: string): void {
+  const now = Date.now()
+  upsertDomainStmt.run(domain, now, now)
+}
+
+export function getScan(domain: string): ScanRow | undefined {
+  return getScanStmt.get(domain) as ScanRow | undefined
+}
+
+export function recordScan(row: Omit<ScanRow, 'scanned_at'> & { scanned_at?: number }): void {
+  upsertScanStmt.run(
+    row.domain,
+    row.scanned_at ?? Date.now(),
+    row.is_nuxt,
+    row.nuxt_version,
+    row.confidence,
+    row.signals,
+    row.final_url,
+    row.title,
+    row.screenshot_path,
+    row.og_image,
+    row.redirected_to,
+    row.error,
+  )
+}
+
+export function hasNotified(domain: string, channel: string): boolean {
+  return !!hasNotifiedStmt.get(domain, channel)
+}
+
+export function recordNotification(domain: string, channel: string): void {
+  recordNotificationStmt.run(domain, channel, Date.now())
+}
+
+const lastNotifiedStmt = db.prepare(
+  `SELECT MAX(posted_at) AS at FROM notifications WHERE channel = ?`,
+)
+export function lastNotifiedAt(channel: string): number {
+  const row = lastNotifiedStmt.get(channel) as { at: number | null } | undefined
+  return row?.at ?? 0
+}

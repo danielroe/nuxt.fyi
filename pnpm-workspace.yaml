@@ -1,0 +1,8 @@
+packages:
+  - '.'
+  - 'dashboard'
+allowBuilds:
+  '@parcel/watcher': true
+  esbuild: true
+minimumReleaseAgeExclude:
+  - '@atproto/api@0.20.6'
