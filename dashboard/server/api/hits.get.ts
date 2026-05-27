@@ -79,6 +79,7 @@ export default defineCachedEventHandler((event) => {
   }
 }, {
   swr: true,
+  maxAge: 1,
   getKey: event => {
     const query = getQuery(event)
     return `hits:${query.page ?? 1}:${query.version ?? 'all'}:${query.sort ?? 'scanned_at'}:${query.order ?? 'desc'}`

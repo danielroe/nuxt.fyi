@@ -74,6 +74,7 @@ export default defineCachedEventHandler((event) => {
   }
 }, {
   swr: true,
+  maxAge: 1,
   getKey: event => {
     const query = getQuery(event)
     return `recent:${query.limit ?? 100}:${query.sort ?? 'last_seen'}:${query.order ?? 'desc'}:${query.filter ?? 'all'}`
