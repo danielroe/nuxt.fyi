@@ -72,11 +72,11 @@ function detailPath(domain: string): RouteLocationRaw {
       >{{ opt.label }}</NuxtLink>
     </nav>
 
-    <div v-if="pending && !data" class="muted">loading\u2026</div>
+    <div v-if="pending && !data" class="muted">loading…</div>
 
     <div v-if="data" class="grid">
       <NuxtLink
-        v-for="hit in data.hits"
+        v-for="(hit, index) in data.hits"
         :key="hit.domain"
         :to="detailPath(hit.domain)"
         class="hit"
@@ -86,7 +86,11 @@ function detailPath(domain: string): RouteLocationRaw {
             v-if="hit.imageUrl"
             :src="hit.imageUrl"
             :alt="`${hit.domain} preview`"
-            loading="lazy"
+            width="1280"
+            height="800"
+            :loading="index < 2 ? 'eager' : 'lazy'"
+            :fetchpriority="index === 0 ? 'high' : 'auto'"
+            decoding="async"
             referrerpolicy="no-referrer"
           >
           <div v-else class="no-shot">no image</div>

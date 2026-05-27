@@ -93,7 +93,7 @@ function sortIndicator(key: Sort): string {
       >{{ opt.label }}</NuxtLink>
     </nav>
 
-    <div v-if="pending && !data" class="muted">loading\u2026</div>
+    <div v-if="pending && !data" class="muted">loading…</div>
 
     <table v-if="data" class="rows">
       <thead>

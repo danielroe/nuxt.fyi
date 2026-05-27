@@ -56,7 +56,15 @@ const backTo = computed<RouteLocationRaw>(() => {
       </p>
 
       <div v-if="data.imageUrl" class="screenshot">
-        <img :src="data.imageUrl" :alt="`${data.domain} preview`" loading="lazy" referrerpolicy="no-referrer">
+        <img
+          :src="data.imageUrl"
+          :alt="`${data.domain} preview`"
+          width="1280"
+          height="800"
+          fetchpriority="high"
+          decoding="async"
+          referrerpolicy="no-referrer"
+        >
       </div>
 
       <h2>Detection</h2>
