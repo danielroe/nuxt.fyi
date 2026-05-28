@@ -17,7 +17,7 @@ const unknownVersions = computed(() =>
 
 <template>
   <div v-if="data">
-    <h1>Overview</h1>
+    <h1>overview</h1>
 
     <div class="grid">
       <div class="card">
