@@ -7,8 +7,8 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "PORT=3001 vite dev",
-    "build": "vite build",
+    "dev": "PORT=3001 nitro dev",
+    "build": "nitro build",
     "start": "node .output/server/index.mjs",
     "preview": "node --env-file-if-exists=../../.env .output/server/index.mjs",
     "test:types": "tsc --noEmit",
@@ -25,7 +25,6 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "typescript": "^5.7.0",
-    "vite": "^7.0.0"
+    "typescript": "^5.7.0"
   }
 }
