@@ -8,24 +8,15 @@
   },
   "packageManager": "pnpm@11.3.0",
   "scripts": {
-    "start": "node --env-file-if-exists=.env src/index.ts",
-    "dev": "node --watch --env-file-if-exists=.env src/index.ts",
-    "probe": "node --env-file-if-exists=.env src/cli/probe.ts",
-    "stats": "node --env-file-if-exists=.env src/cli/stats.ts",
-    "test": "node --test 'src/**/*.test.ts'",
-    "test:types": "tsc --noEmit",
-    "install-extension": "node scripts/fetch-extension.mjs",
-    "ingest-tranco": "node scripts/ingest-tranco.mjs",
-    "ingest-nuxt-versions": "node scripts/ingest-nuxt-versions.mjs"
-  },
-  "dependencies": {
-    "@atproto/api": "^0.20.6",
-    "consola": "^3.4.0",
-    "playwright": "^1.49.0",
-    "tldts": "^6.1.0"
-  },
-  "devDependencies": {
-    "@types/node": "^24.0.0",
-    "typescript": "^5.7.0"
+    "start": "pnpm --filter @nuxt-fyi/daemon start",
+    "dev": "pnpm --filter @nuxt-fyi/daemon dev",
+    "dev:dashboard": "pnpm --filter nuxt-fyi-dashboard dev",
+    "probe": "pnpm --filter @nuxt-fyi/daemon probe",
+    "stats": "pnpm --filter @nuxt-fyi/daemon stats",
+    "test": "pnpm -r --workspace-concurrency=1 test",
+    "test:types": "pnpm -r test:types",
+    "install-extension": "pnpm --filter @nuxt-fyi/daemon install-extension",
+    "ingest-tranco": "pnpm --filter @nuxt-fyi/daemon ingest-tranco",
+    "ingest-nuxt-versions": "pnpm --filter @nuxt-fyi/daemon ingest-nuxt-versions"
   }
 }

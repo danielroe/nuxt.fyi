@@ -36,7 +36,7 @@ pnpm exec playwright install chromium
 pnpm dev
 
 # dashboard (separate terminal)
-NUXT_DATA_DIR=../data NUXT_SCREENSHOT_DIR=../screenshots pnpm --filter nuxt-fyi-dashboard dev
+pnpm dev:dashboard
 ```
 
 Set `VERBOSE=1` to log every post the daemon sees.

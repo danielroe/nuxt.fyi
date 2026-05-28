@@ -15,8 +15,11 @@ export const config = {
   discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
   scanConcurrency: num(process.env.SCAN_CONCURRENCY, 2),
   rescanAfterMs: num(process.env.RESCAN_AFTER_MS, 30 * 24 * 60 * 60 * 1000),
-  dataDir: resolve(process.env.NUXT_DATA_DIR || './data'),
-  screenshotDir: resolve(process.env.NUXT_SCREENSHOT_DIR || './screenshots'),
+  // Defaults point at the repo-root `data/` and `screenshots/` directories, two levels
+  // up from this package (`services/daemon/`). The dashboard's defaults resolve to the
+  // same paths from its own location so both processes share state out of the box.
+  dataDir: resolve(process.env.NUXT_DATA_DIR || '../../data'),
+  screenshotDir: resolve(process.env.NUXT_SCREENSHOT_DIR || '../../screenshots'),
   verbose: bool(process.env.VERBOSE),
   bluesky: {
     service: process.env.BLUESKY_SERVICE || 'https://bsky.social',

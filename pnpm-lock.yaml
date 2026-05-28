@@ -6,27 +6,7 @@ settings:
 
 importers:
 
-  .:
-    dependencies:
-      '@atproto/api':
-        specifier: ^0.20.6
-        version: 0.20.6
-      consola:
-        specifier: ^3.4.0
-        version: 3.4.2
-      playwright:
-        specifier: ^1.49.0
-        version: 1.60.0
-      tldts:
-        specifier: ^6.1.0
-        version: 6.1.86
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.0
-        version: 24.12.4
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
+  .: {}
 
   dashboard:
     dependencies:
@@ -49,6 +29,28 @@ importers:
       vue-tsc:
         specifier: ^2.2.0
         version: 2.2.12(typescript@5.9.3)
+
+  services/daemon:
+    dependencies:
+      '@atproto/api':
+        specifier: ^0.20.6
+        version: 0.20.6
+      consola:
+        specifier: ^3.4.0
+        version: 3.4.2
+      playwright:
+        specifier: ^1.49.0
+        version: 1.60.0
+      tldts:
+        specifier: ^6.1.0
+        version: 6.1.86
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.12.4
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
 packages:
 
@@ -6723,7 +6725,7 @@ snapshots:
       '@rollup/rollup-win32-ia32-msvc': 4.60.4
       '@rollup/rollup-win32-x64-gnu': 4.60.4
       '@rollup/rollup-win32-x64-msvc': 4.60.4
-      fsevents: 2.3.2
+      fsevents: 2.3.3
 
   rou3@0.8.1: {}
 

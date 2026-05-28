@@ -17,7 +17,7 @@ import { execSync } from 'node:child_process'
 import { readFileSync, rmSync } from 'node:fs'
 
 const TRANCO_URL = 'https://tranco-list.eu/top-1m.csv.zip'
-const DATA_DIR = resolve(process.env.DATA_DIR || './data')
+const DATA_DIR = resolve(process.env.DATA_DIR || '../../data')
 const LEGACY_DB = join(DATA_DIR, 'nuxt-eye.db')
 const CURRENT_DB = join(DATA_DIR, 'nuxt-fyi.db')
 const DB_PATH = existsSync(CURRENT_DB) ? CURRENT_DB : LEGACY_DB

@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-const DATA_DIR = resolve(process.env.DATA_DIR || './data')
+const DATA_DIR = resolve(process.env.DATA_DIR || '../../data')
 const DB_PATH = join(DATA_DIR, 'nuxt-fyi.db')
 const REGISTRY_URL = 'https://registry.npmjs.org/nuxt'
 

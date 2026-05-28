@@ -13,6 +13,7 @@ primary_region = "lhr"
   wait_timeout = "5m"
 
 [build]
+  dockerfile = "services/daemon/Dockerfile"
 
 [env]
   JETSTREAM_URL = "wss://jetstream2.us-east.bsky.network/subscribe"

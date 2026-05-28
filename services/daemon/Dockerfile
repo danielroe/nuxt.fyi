@@ -3,21 +3,21 @@ FROM node:24-bookworm-slim AS workspace
 WORKDIR /repo
 RUN corepack enable
 
-# Copy the entire workspace metadata so `pnpm install --frozen-lockfile` can resolve the
-# whole graph. Source code is copied in the build/runtime stages, not here.
+# Build context is the repo root (see `[build] dockerfile = ...` in fly.toml). We need
+# every package.json reachable so `pnpm install` can resolve the workspace graph.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY services/daemon/package.json services/daemon/
 COPY dashboard/package.json dashboard/
 
 RUN pnpm fetch
 
-# Now copy each package.json into its position (already done above), plus actual source.
-# We split deps install into two stages so the daemon image doesn't need Nuxt's devDeps.
+# Split deps install into two stages so the daemon image doesn't need Nuxt's devDeps.
 
 # --- daemon: production deps only ---
 FROM workspace AS daemon-deps
 
 ENV CI=true
-RUN pnpm install --filter nuxt-fyi --prod --frozen-lockfile --ignore-scripts --offline
+RUN pnpm install --filter @nuxt-fyi/daemon --prod --frozen-lockfile --ignore-scripts --offline
 
 # --- dashboard: install + build ---
 FROM workspace AS dashboard-build
@@ -39,9 +39,11 @@ ENV NUXT_SCREENSHOT_DIR=/data/screenshots
 WORKDIR /app
 RUN corepack enable
 
+# Daemon's hoisted node_modules end up in the workspace root after pnpm install. The
+# daemon process is launched from /app, so we place them there too.
 COPY --from=daemon-deps /repo/node_modules ./node_modules
-COPY package.json ./
-COPY scripts ./scripts
+COPY services/daemon/package.json ./
+COPY services/daemon/scripts ./scripts
 # One apt cycle: Chromium runtime deps (via playwright), plus curl/unzip needed at build
 # (extension fetch) and runtime (periodic Tranco/nuxt-versions ingest).
 RUN node_modules/.bin/playwright install --with-deps chromium \
@@ -49,8 +51,8 @@ RUN node_modules/.bin/playwright install --with-deps chromium \
  && node scripts/fetch-extension.mjs \
  && rm -rf /var/lib/apt/lists/*
 
-COPY src ./src
-COPY tsconfig.json ./
+COPY services/daemon/src ./src
+COPY services/daemon/tsconfig.json ./
 
 # Nitro's standalone output bundles its own node_modules; no install needed at runtime.
 COPY --from=dashboard-build /repo/dashboard/.output ./dashboard/.output
