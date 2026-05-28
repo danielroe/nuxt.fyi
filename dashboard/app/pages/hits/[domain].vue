@@ -63,16 +63,13 @@ const backTo = computed<RouteLocationRaw>(() => {
         </NuxtLink>
       </p>
 
-      <div v-if="data.imageUrl" class="screenshot">
-        <img
-          :src="data.imageUrl"
+      <div class="screenshot">
+        <HitImage
+          :image="data.image"
           :alt="`Homepage screenshot of ${data.domain}`"
-          width="1280"
-          height="800"
+          loading="eager"
           fetchpriority="high"
-          decoding="async"
-          referrerpolicy="no-referrer"
-        >
+        />
       </div>
 
       <h2>Detection</h2>

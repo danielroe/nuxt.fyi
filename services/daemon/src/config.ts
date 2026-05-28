@@ -21,6 +21,15 @@ export const config = {
   dataDir: resolve(process.env.NUXT_DATA_DIR || '../../data'),
   screenshotDir: resolve(process.env.NUXT_SCREENSHOT_DIR || '../../screenshots'),
   verbose: bool(process.env.VERBOSE),
+  imagekit: {
+    /** Public URL endpoint, e.g. https://ik.imagekit.io/<id>. Empty disables uploads. */
+    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || '',
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY || '',
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY || '',
+    /** Base folder inside the bucket. Screenshots and og:images get distinct subfolders
+     *  underneath so the dashboard can render both for the same domain. */
+    rootFolder: process.env.IMAGEKIT_ROOT_FOLDER || '/nuxt-fyi',
+  },
   bluesky: {
     service: process.env.BLUESKY_SERVICE || 'https://bsky.social',
     identifier: process.env.BLUESKY_IDENTIFIER || '',

@@ -1,6 +1,6 @@
 import type { SQLInputValue } from 'node:sqlite'
 import { getDb, type ScanRow } from '../utils/db'
-import { imageUrlFor } from '../utils/image-url'
+import { imageSourcesFor } from '../utils/image-url'
 
 const PAGE_SIZE = 30
 
@@ -46,6 +46,7 @@ export default defineCachedEventHandler((event) => {
   const rows = db.prepare(`
     SELECT s.domain, s.scanned_at, s.nuxt_version, s.confidence, s.signals,
            s.final_url, s.title, s.screenshot_path, s.og_image,
+           s.screenshot_key, s.og_image_key,
            d.seen_count,
            COALESCE(tw.rank, ta.rank) AS tranco_rank_value
     FROM scans s
@@ -55,7 +56,7 @@ export default defineCachedEventHandler((event) => {
     WHERE ${where}
     ORDER BY ${orderClause}
     LIMIT ? OFFSET ?
-  `).all(...params, PAGE_SIZE, (page - 1) * PAGE_SIZE) as unknown as Array<Pick<ScanRow, 'domain' | 'scanned_at' | 'nuxt_version' | 'confidence' | 'signals' | 'final_url' | 'title' | 'screenshot_path' | 'og_image'> & { seen_count: number | null, tranco_rank_value: number | null }>
+  `).all(...params, PAGE_SIZE, (page - 1) * PAGE_SIZE) as unknown as Array<Pick<ScanRow, 'domain' | 'scanned_at' | 'nuxt_version' | 'confidence' | 'signals' | 'final_url' | 'title' | 'screenshot_path' | 'og_image' | 'screenshot_key' | 'og_image_key'> & { seen_count: number | null, tranco_rank_value: number | null }>
 
   return {
     total,
@@ -72,7 +73,7 @@ export default defineCachedEventHandler((event) => {
       signals: (() => { try { return JSON.parse(r.signals) as Array<{ name: string, weight: number, detail?: string }> } catch { return [] } })(),
       finalUrl: r.final_url,
       title: r.title,
-      imageUrl: imageUrlFor(r.domain, r.og_image, r.screenshot_path),
+      image: imageSourcesFor(r.domain, r.og_image, r.screenshot_path, r.screenshot_key, r.og_image_key),
       seenCount: r.seen_count,
       rank: r.tranco_rank_value,
     })),

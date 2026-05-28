@@ -41,6 +41,14 @@ pnpm dev:dashboard
 
 Set `VERBOSE=1` to log every post the daemon sees.
 
+## Image hosting
+
+Screenshots and og:images are uploaded to [ImageKit](https://imagekit.io) at scan time so
+the dashboard can render them through `@nuxt/image` with on-the-fly resizing. ImageKit is
+optional: if `IMAGEKIT_URL_ENDPOINT` / `IMAGEKIT_PRIVATE_KEY` are unset, uploads are
+skipped and the dashboard falls back to streaming the daemon's local screenshot directory
+via `/api/screenshots/<domain>`.
+
 ## Admin CLI
 
 On the running Fly machine (`fly ssh console -C bash`), you can re-scan one or more

@@ -15,6 +15,7 @@
     "test:types": "nuxt typecheck"
   },
   "dependencies": {
+    "@nuxt/image": "^2.0.0",
     "nuxt": "^4.4.6",
     "unstorage": "^1.17.5",
     "vue": "^3.5.0",

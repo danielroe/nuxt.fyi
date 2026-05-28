@@ -6,6 +6,7 @@ import { screenshot } from './headless.ts'
 import { canonicalDomain } from '../domains.ts'
 import { parse as parseHost } from 'tldts'
 import type { DetectionResult, DetectionSignal } from './detect.ts'
+import { uploadOgImage, uploadScreenshot } from '../imagekit.ts'
 
 export interface ScanOutcome {
   domain: string
@@ -17,6 +18,11 @@ export interface ScanOutcome {
   screenshotPath: string | null
   /** og:image URL declared by the site, validated as reachable and image-typed. */
   ogImage: string | null
+  /** ImageKit path for the captured screenshot, when upload succeeded. */
+  screenshotKey: string | null
+  /** ImageKit path for the uploaded copy of the og:image, when both fetch and upload
+   *  succeeded. */
+  ogImageKey: string | null
   /** Set when the HTML fetch followed a redirect to a different registrable domain. The
    *  outcome itself doesn't include detection results in that case; the destination should
    *  be scanned independently. */
@@ -95,6 +101,8 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
       description: null,
       screenshotPath: null,
       ogImage: null,
+      screenshotKey: null,
+      ogImageKey: null,
       redirectedTo: null,
       error: (err as Error).message,
     }
@@ -115,6 +123,8 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
       description: html.description,
       screenshotPath: null,
       ogImage: null,
+      screenshotKey: null,
+      ogImageKey: null,
       redirectedTo: canonicalDomain(new URL(html.finalUrl).hostname),
       error: null,
     }
@@ -164,25 +174,32 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
 
   let ogImage: string | null = null
   let screenshotPath: string | null = null
+  let screenshotKey: string | null = null
+  let ogImageKey: string | null = null
   let screenshotError: string | null = null
   if (detection.isNuxt) {
-    // Prefer the site's own og:image when available and reachable: it's higher quality
-    // than our 1280x800 screenshot, hosted on the site's CDN, and avoids the cost of a
-    // headless capture. We still take a screenshot as a fallback so the dashboard always
-    // has something to render even if the og:image goes 404 later.
+    // Capture both sources when available: the dashboard offers a toggle between them
+    // so we want both uploaded to ImageKit independently. Either failing is non-fatal;
+    // the row just renders without that source.
     if (html.ogImage) {
       ogImage = await validateOgImage(html.ogImage)
       if (ogImage) log.debug(`[scan] ${domain} og:image ok: ${ogImage}`)
       else log.debug(`[scan] ${domain} og:image rejected (${html.ogImage})`)
     }
-    if (!ogImage) {
-      try {
-        screenshotPath = await screenshot(html.finalUrl, domain)
-      }
-      catch (err) {
-        screenshotError = `screenshot: ${(err as Error).message}`
-        log.warn(`[scan] ${domain} screenshot failed: ${(err as Error).message}`)
-      }
+    try {
+      screenshotPath = await screenshot(html.finalUrl, domain)
+    }
+    catch (err) {
+      screenshotError = `screenshot: ${(err as Error).message}`
+      log.warn(`[scan] ${domain} screenshot failed: ${(err as Error).message}`)
+    }
+    if (screenshotPath) {
+      const uploaded = await uploadScreenshot(domain, screenshotPath)
+      if (uploaded) screenshotKey = uploaded.filePath
+    }
+    if (ogImage) {
+      const uploaded = await uploadOgImage(domain, ogImage)
+      if (uploaded) ogImageKey = uploaded.filePath
     }
   }
 
@@ -195,6 +212,8 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
     redirectedTo: null,
     screenshotPath,
     ogImage,
+    screenshotKey,
+    ogImageKey,
     error: screenshotError,
   }
 }
@@ -202,6 +221,8 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
 export interface RecaptureOutcome {
   ogImage: string | null
   screenshotPath: string | null
+  screenshotKey: string | null
+  ogImageKey: string | null
   finalUrl: string
   title: string | null
   description: string | null
@@ -210,10 +231,11 @@ export interface RecaptureOutcome {
 
 /**
  * Refreshes just the image bits of an existing hit: re-fetches HTML to find the current
- * og:image and recaptures the screenshot. Detection signals, confidence and version are
- * untouched; the caller is expected to be operating on a domain already classified as
- * Nuxt. Returns the new image fields plus the live HTML metadata (title, description)
- * so the caller can decide whether to update those too.
+ * og:image and recaptures the screenshot, then uploads both to ImageKit. Detection
+ * signals, confidence and version are untouched; the caller is expected to be operating
+ * on a domain already classified as Nuxt. Returns the new image fields plus the live
+ * HTML metadata (title, description) so the caller can decide whether to update those
+ * too.
  */
 export async function recaptureImage(domain: string): Promise<RecaptureOutcome> {
   const url = `https://${domain}/`
@@ -221,6 +243,8 @@ export async function recaptureImage(domain: string): Promise<RecaptureOutcome> 
 
   let ogImage: string | null = null
   let screenshotPath: string | null = null
+  let screenshotKey: string | null = null
+  let ogImageKey: string | null = null
   let error: string | null = null
 
   if (html.ogImage) {
@@ -228,19 +252,27 @@ export async function recaptureImage(domain: string): Promise<RecaptureOutcome> 
     if (ogImage) log.debug(`[recapture] ${domain} og:image ok: ${ogImage}`)
     else log.debug(`[recapture] ${domain} og:image rejected (${html.ogImage})`)
   }
-  if (!ogImage) {
-    try {
-      screenshotPath = await screenshot(html.finalUrl, domain)
-    }
-    catch (err) {
-      error = `screenshot: ${(err as Error).message}`
-      log.warn(`[recapture] ${domain} screenshot failed: ${(err as Error).message}`)
-    }
+  try {
+    screenshotPath = await screenshot(html.finalUrl, domain)
+  }
+  catch (err) {
+    error = `screenshot: ${(err as Error).message}`
+    log.warn(`[recapture] ${domain} screenshot failed: ${(err as Error).message}`)
+  }
+  if (screenshotPath) {
+    const uploaded = await uploadScreenshot(domain, screenshotPath)
+    if (uploaded) screenshotKey = uploaded.filePath
+  }
+  if (ogImage) {
+    const uploaded = await uploadOgImage(domain, ogImage)
+    if (uploaded) ogImageKey = uploaded.filePath
   }
 
   return {
     ogImage,
     screenshotPath,
+    screenshotKey,
+    ogImageKey,
     finalUrl: html.finalUrl,
     title: html.title,
     description: html.description,

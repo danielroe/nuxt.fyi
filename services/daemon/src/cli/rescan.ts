@@ -66,6 +66,8 @@ interface Result {
   finalUrl?: string | null
   ogImage?: string | null
   screenshotPath?: string | null
+  screenshotKey?: string | null
+  ogImageKey?: string | null
   notified?: boolean
   error?: string | null
 }
@@ -93,9 +95,11 @@ for (const domain of domains) {
         title: out.title,
         screenshotPath: out.screenshotPath,
         ogImage: out.ogImage,
+        screenshotKey: out.screenshotKey,
+        ogImageKey: out.ogImageKey,
         error: out.error,
       })
-      log.success(`[rescan] ${domain} image refreshed (og:${out.ogImage ? 'yes' : 'no'} shot:${out.screenshotPath ? 'yes' : 'no'})`)
+      log.success(`[rescan] ${domain} image refreshed (og:${out.ogImage ? 'yes' : 'no'} shot:${out.screenshotPath ? 'yes' : 'no'} ik-shot:${out.screenshotKey ? 'yes' : 'no'} ik-og:${out.ogImageKey ? 'yes' : 'no'})`)
       results.push({
         domain,
         ok: !out.error,
@@ -122,7 +126,7 @@ for (const domain of domains) {
       await dispatchNotifications(outcome)
       notified = true
     }
-    log.info(`[rescan] ${domain} done (nuxt=${outcome.detection.isNuxt} confidence=${outcome.detection.confidence})`)
+    log.info(`[rescan] ${domain} done (nuxt=${outcome.detection.isNuxt} confidence=${outcome.detection.confidence} ik-shot:${outcome.screenshotKey ? 'yes' : 'no'} ik-og:${outcome.ogImageKey ? 'yes' : 'no'})`)
     results.push({
       domain,
       ok: !outcome.error,
@@ -133,6 +137,8 @@ for (const domain of domains) {
       finalUrl: outcome.finalUrl,
       ogImage: outcome.ogImage,
       screenshotPath: outcome.screenshotPath,
+      screenshotKey: outcome.screenshotKey,
+      ogImageKey: outcome.ogImageKey,
       notified,
       error: outcome.error,
     })

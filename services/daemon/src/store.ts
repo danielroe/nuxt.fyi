@@ -67,6 +67,8 @@ db.exec(`
 for (const ddl of [
   `ALTER TABLE scans ADD COLUMN og_image TEXT`,
   `ALTER TABLE scans ADD COLUMN redirected_to TEXT`,
+  `ALTER TABLE scans ADD COLUMN screenshot_key TEXT`,
+  `ALTER TABLE scans ADD COLUMN og_image_key TEXT`,
 ]) {
   try { db.exec(ddl) }
   catch (err) {
@@ -85,8 +87,8 @@ const upsertDomainStmt = db.prepare(`
 const getScanStmt = db.prepare(`SELECT * FROM scans WHERE domain = ?`)
 
 const upsertScanStmt = db.prepare(`
-  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error, screenshot_key, og_image_key)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(domain) DO UPDATE SET
     scanned_at = excluded.scanned_at,
     is_nuxt = excluded.is_nuxt,
@@ -98,7 +100,9 @@ const upsertScanStmt = db.prepare(`
     screenshot_path = excluded.screenshot_path,
     og_image = excluded.og_image,
     redirected_to = excluded.redirected_to,
-    error = excluded.error
+    error = excluded.error,
+    screenshot_key = excluded.screenshot_key,
+    og_image_key = excluded.og_image_key
 `)
 
 const updateImageStmt = db.prepare(`
@@ -108,6 +112,8 @@ const updateImageStmt = db.prepare(`
     title = COALESCE(?, title),
     screenshot_path = ?,
     og_image = ?,
+    screenshot_key = ?,
+    og_image_key = ?,
     error = ?
   WHERE domain = ?
 `)
@@ -132,6 +138,12 @@ export interface ScanRow {
    *  Nuxt detection was performed against that destination, not this row's domain. */
   redirected_to: string | null
   error: string | null
+  /** ImageKit path (e.g. `/nuxt-fyi/screenshots/example.com.jpg`) for the screenshot
+   *  uploaded at scan time. Null if upload failed or ImageKit isn't configured. */
+  screenshot_key: string | null
+  /** ImageKit path for the upstream og:image, re-uploaded so the dashboard can render
+   *  it through the same provider as the screenshot. */
+  og_image_key: string | null
 }
 
 export function recordDomainSeen(domain: string): void {
@@ -155,6 +167,8 @@ export function recordRescanImage(input: {
   title: string | null
   screenshotPath: string | null
   ogImage: string | null
+  screenshotKey: string | null
+  ogImageKey: string | null
   error: string | null
 }): void {
   updateImageStmt.run(
@@ -163,6 +177,8 @@ export function recordRescanImage(input: {
     input.title,
     input.screenshotPath,
     input.ogImage,
+    input.screenshotKey,
+    input.ogImageKey,
     input.error,
     input.domain,
   )
@@ -182,6 +198,8 @@ export function recordScan(row: Omit<ScanRow, 'scanned_at'> & { scanned_at?: num
     row.og_image,
     row.redirected_to,
     row.error,
+    row.screenshot_key,
+    row.og_image_key,
   )
 }
 

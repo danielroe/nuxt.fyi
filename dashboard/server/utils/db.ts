@@ -43,6 +43,8 @@ export interface ScanRow {
   title: string | null
   screenshot_path: string | null
   og_image: string | null
+  screenshot_key: string | null
+  og_image_key: string | null
   redirected_to: string | null
   error: string | null
 }

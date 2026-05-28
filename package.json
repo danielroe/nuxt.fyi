@@ -18,6 +18,7 @@
     "test:types": "pnpm -r test:types",
     "install-extension": "pnpm --filter @nuxt-fyi/daemon install-extension",
     "ingest-tranco": "pnpm --filter @nuxt-fyi/daemon ingest-tranco",
-    "ingest-nuxt-versions": "pnpm --filter @nuxt-fyi/daemon ingest-nuxt-versions"
+    "ingest-nuxt-versions": "pnpm --filter @nuxt-fyi/daemon ingest-nuxt-versions",
+    "backfill-imagekit": "pnpm --filter @nuxt-fyi/daemon backfill-imagekit"
   }
 }

@@ -87,18 +87,12 @@ function detailPath(domain: string): RouteLocationRaw {
       <li v-for="(hit, index) in data.hits" :key="hit.domain">
         <NuxtLink :to="detailPath(hit.domain)" class="hit">
           <div class="thumb">
-            <img
-              v-if="hit.imageUrl"
-              :src="hit.imageUrl"
+            <HitImage
+              :image="hit.image"
               :alt="`Homepage screenshot of ${hit.domain}`"
-              width="1280"
-              height="800"
               :loading="index < 2 ? 'eager' : 'lazy'"
               :fetchpriority="index === 0 ? 'high' : 'auto'"
-              decoding="async"
-              referrerpolicy="no-referrer"
-            >
-            <div v-else class="no-shot" aria-hidden="true">no image</div>
+            />
           </div>
           <div class="meta">
             <div class="domain"><DomainText :domain="hit.domain" /></div>

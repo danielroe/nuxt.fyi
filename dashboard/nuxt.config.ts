@@ -8,9 +8,18 @@ const uiOnlyTarget = process.env.NUXT_UI_ONLY_TARGET || 'https://nuxt.fyi'
 export default defineNuxtConfig({
   compatibilityDate: '2025-01-01',
   devtools: { enabled: true },
+  modules: ['@nuxt/image'],
   runtimeConfig: {
     dataDir: '../data',
     screenshotDir: '../screenshots',
+    public: {
+      imagekitEndpoint: process.env.NUXT_PUBLIC_IMAGEKIT_ENDPOINT || '',
+    },
+  },
+  image: {
+    imagekit: {
+      baseURL: process.env.NUXT_PUBLIC_IMAGEKIT_ENDPOINT || 'https://ik.imagekit.io/missing',
+    },
   },
   experimental: {
     typedPages: true,

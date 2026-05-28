@@ -19,6 +19,8 @@ export function persistOutcome(outcome: ScanOutcome): void {
     title: outcome.title,
     screenshot_path: outcome.screenshotPath,
     og_image: outcome.ogImage,
+    screenshot_key: outcome.screenshotKey,
+    og_image_key: outcome.ogImageKey,
     redirected_to: outcome.redirectedTo,
     error: outcome.error,
   })
