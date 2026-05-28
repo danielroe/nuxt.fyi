@@ -108,7 +108,7 @@ const backTo = computed<RouteLocationRaw>(() => {
 .back:hover { color: var(--accent); }
 h1 { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .rank { color: #b9d; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.85rem; }
-.screenshot { border: 1px solid var(--border); margin: 1rem 0; }
+.screenshot { border: 1px solid var(--border); margin: 1rem 0; overflow: hidden; }
 .screenshot img { width: 100%; height: auto; display: block; }
 .signals { list-style: none; padding: 0; }
 .signals li { padding: 0.4rem 0; border-bottom: 1px solid var(--border); display: flex; gap: 1rem; align-items: baseline; }

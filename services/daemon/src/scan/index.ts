@@ -26,6 +26,13 @@ export interface ScanOutcome {
   /** ImageKit path for the uploaded copy of the og:image, when both fetch and upload
    *  succeeded. */
   ogImageKey: string | null
+  /** NSFW classification of the screenshot, when classification ran. The scanner only
+   *  classifies its own screenshot; og:image-only rows stay unclassified (null) on the
+   *  steady-state path. The backfill script fills both in retrospectively. */
+  nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null
+  nsfwScore: number | null
+  nsfwCategories: string | null
+  nsfwClassifiedAt: number | null
   /** Set when the HTML fetch followed a redirect to a different registrable domain. The
    *  outcome itself doesn't include detection results in that case; the destination should
    *  be scanned independently. */
@@ -106,6 +113,10 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
       ogImage: null,
       screenshotKey: null,
       ogImageKey: null,
+      nsfwLabel: null,
+      nsfwScore: null,
+      nsfwCategories: null,
+      nsfwClassifiedAt: null,
       redirectedTo: null,
       error: (err as Error).message,
     }
@@ -128,6 +139,10 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
       ogImage: null,
       screenshotKey: null,
       ogImageKey: null,
+      nsfwLabel: null,
+      nsfwScore: null,
+      nsfwCategories: null,
+      nsfwClassifiedAt: null,
       redirectedTo: canonicalDomain(new URL(html.finalUrl).hostname),
       error: null,
     }
@@ -179,12 +194,17 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
   const screenshotPath: string | null = null
   let screenshotKey: string | null = null
   let ogImageKey: string | null = null
+  let nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null = null
+  let nsfwScore: number | null = null
+  let nsfwCategories: string | null = null
+  let nsfwClassifiedAt: number | null = null
   let screenshotError: string | null = null
   if (detection.isNuxt) {
     // Both sources are captured and uploaded independently so the dashboard can offer a
     // toggle between them. The screenshot is delegated to the scanner service (which
-    // owns Playwright and the screenshot half of the ImageKit upload); the og:image is
-    // fetched and uploaded directly from here. Either failing is non-fatal.
+    // owns Playwright + nsfwjs classification + the screenshot half of the ImageKit
+    // upload); the og:image is fetched and uploaded directly from here. Either failing
+    // is non-fatal.
     if (html.ogImage) {
       ogImage = await validateOgImage(html.ogImage)
       if (ogImage) log.debug(`[scan] ${domain} og:image ok: ${ogImage}`)
@@ -193,6 +213,12 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
     const capture = await remoteCapture(html.finalUrl, domain)
     if (capture) {
       screenshotKey = capture.imageKey
+      if (capture.nsfw) {
+        nsfwLabel = capture.nsfw.label
+        nsfwScore = capture.nsfw.score
+        nsfwCategories = JSON.stringify(capture.nsfw.categories)
+        nsfwClassifiedAt = capture.capturedAt
+      }
       if (capture.error && !capture.imageKey) {
         screenshotError = `screenshot: ${capture.error}`
         log.warn(`[scan] ${domain} scanner reported: ${capture.error}`)
@@ -215,6 +241,10 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
     ogImage,
     screenshotKey,
     ogImageKey,
+    nsfwLabel,
+    nsfwScore,
+    nsfwCategories,
+    nsfwClassifiedAt,
     error: screenshotError,
   }
 }
@@ -224,6 +254,10 @@ export interface RecaptureOutcome {
   screenshotPath: string | null
   screenshotKey: string | null
   ogImageKey: string | null
+  nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null
+  nsfwScore: number | null
+  nsfwCategories: string | null
+  nsfwClassifiedAt: number | null
   finalUrl: string
   title: string | null
   description: string | null
@@ -248,6 +282,10 @@ export async function recaptureImage(domain: string): Promise<RecaptureOutcome> 
   const screenshotPath: string | null = null
   let screenshotKey: string | null = null
   let ogImageKey: string | null = null
+  let nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null = null
+  let nsfwScore: number | null = null
+  let nsfwCategories: string | null = null
+  let nsfwClassifiedAt: number | null = null
   let error: string | null = null
 
   if (html.ogImage) {
@@ -258,6 +296,12 @@ export async function recaptureImage(domain: string): Promise<RecaptureOutcome> 
   const capture = await remoteCapture(html.finalUrl, domain)
   if (capture) {
     screenshotKey = capture.imageKey
+    if (capture.nsfw) {
+      nsfwLabel = capture.nsfw.label
+      nsfwScore = capture.nsfw.score
+      nsfwCategories = JSON.stringify(capture.nsfw.categories)
+      nsfwClassifiedAt = capture.capturedAt
+    }
     if (capture.error && !capture.imageKey) {
       error = `screenshot: ${capture.error}`
       log.warn(`[recapture] ${domain} scanner reported: ${capture.error}`)
@@ -273,6 +317,10 @@ export async function recaptureImage(domain: string): Promise<RecaptureOutcome> 
     screenshotPath,
     screenshotKey,
     ogImageKey,
+    nsfwLabel,
+    nsfwScore,
+    nsfwCategories,
+    nsfwClassifiedAt,
     finalUrl: html.finalUrl,
     title: html.title,
     description: html.description,

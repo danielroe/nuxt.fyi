@@ -26,7 +26,7 @@ export default defineEventHandler((event) => {
     finalUrl: scan.final_url,
     title: scan.title,
     error: scan.error,
-    image: imageSourcesFor(scan.domain, scan.og_image, scan.screenshot_path, scan.screenshot_key, scan.og_image_key),
+    image: imageSourcesFor(scan.domain, scan.og_image, scan.screenshot_path, scan.screenshot_key, scan.og_image_key, scan.nsfw_label),
     redirectedTo: scan.redirected_to,
     firstSeenAt: seen?.first_seen_at ?? null,
     lastSeenAt: seen?.last_seen_at ?? null,

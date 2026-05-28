@@ -16,6 +16,11 @@ export interface RemoteCaptureResult {
   height: number
   bytes: number
   capturedAt: number
+  nsfw: {
+    label: 'safe' | 'suggestive' | 'nsfw'
+    score: number | null
+    categories: Record<string, unknown>
+  } | null
   error: string | null
 }
 

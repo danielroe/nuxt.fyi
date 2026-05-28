@@ -14,7 +14,10 @@ RUN pnpm fetch
 FROM workspace AS scanner-build
 
 ENV CI=true
-RUN pnpm install --filter @nuxt-fyi/scanner --frozen-lockfile --offline
+# We don't pass --offline here because tfjs-node's postinstall downloads libtensorflow
+# from storage.googleapis.com; pnpm fetch above only seeds the store with package
+# tarballs, not arbitrary runtime artefacts pulled by postinstalls.
+RUN pnpm install --filter @nuxt-fyi/scanner --frozen-lockfile
 COPY services/scanner/ ./services/scanner/
 # Nitro v3 builds with Vite into .output/server/, bundling its own node_modules. The
 # resulting tree is fully self-contained.
@@ -39,7 +42,10 @@ RUN corepack enable
 # no SQLite, no Nuxt, no @atproto/api.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY services/scanner/package.json services/scanner/
-RUN pnpm install --filter @nuxt-fyi/scanner --prod --frozen-lockfile --ignore-scripts
+# We omit --ignore-scripts so tfjs-node's postinstall fetches libtensorflow during the
+# build. Playwright's postinstall also runs (cheap; we still call `playwright install`
+# below to materialise the browser binaries into PLAYWRIGHT_BROWSERS_PATH).
+RUN pnpm install --filter @nuxt-fyi/scanner --prod --frozen-lockfile
 
 COPY services/scanner/scripts ./services/scanner/scripts
 

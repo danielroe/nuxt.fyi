@@ -96,9 +96,13 @@ for (const domain of domains) {
         ogImage: out.ogImage,
         screenshotKey: out.screenshotKey,
         ogImageKey: out.ogImageKey,
+        nsfwLabel: out.nsfwLabel,
+        nsfwScore: out.nsfwScore,
+        nsfwCategories: out.nsfwCategories,
+        nsfwClassifiedAt: out.nsfwClassifiedAt,
         error: out.error,
       })
-      log.success(`[rescan] ${domain} image refreshed (og:${out.ogImage ? 'yes' : 'no'} shot:${out.screenshotPath ? 'yes' : 'no'} ik-shot:${out.screenshotKey ? 'yes' : 'no'} ik-og:${out.ogImageKey ? 'yes' : 'no'})`)
+      log.success(`[rescan] ${domain} image refreshed (og:${out.ogImage ? 'yes' : 'no'} shot:${out.screenshotPath ? 'yes' : 'no'} ik-shot:${out.screenshotKey ? 'yes' : 'no'} ik-og:${out.ogImageKey ? 'yes' : 'no'} nsfw:${out.nsfwLabel ?? 'unknown'})`)
       results.push({
         domain,
         ok: !out.error,

@@ -84,6 +84,10 @@ for (const ddl of [
   `ALTER TABLE scans ADD COLUMN redirected_to TEXT`,
   `ALTER TABLE scans ADD COLUMN screenshot_key TEXT`,
   `ALTER TABLE scans ADD COLUMN og_image_key TEXT`,
+  `ALTER TABLE scans ADD COLUMN nsfw_label TEXT`,
+  `ALTER TABLE scans ADD COLUMN nsfw_score REAL`,
+  `ALTER TABLE scans ADD COLUMN nsfw_categories TEXT`,
+  `ALTER TABLE scans ADD COLUMN nsfw_classified_at INTEGER`,
 ]) {
   try { db.exec(ddl) }
   catch (err) {
@@ -102,8 +106,8 @@ const upsertDomainStmt = db.prepare(`
 const getScanStmt = db.prepare(`SELECT * FROM scans WHERE domain = ?`)
 
 const upsertScanStmt = db.prepare(`
-  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error, screenshot_key, og_image_key)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error, screenshot_key, og_image_key, nsfw_label, nsfw_score, nsfw_categories, nsfw_classified_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(domain) DO UPDATE SET
     scanned_at = excluded.scanned_at,
     is_nuxt = excluded.is_nuxt,
@@ -117,7 +121,11 @@ const upsertScanStmt = db.prepare(`
     redirected_to = excluded.redirected_to,
     error = excluded.error,
     screenshot_key = excluded.screenshot_key,
-    og_image_key = excluded.og_image_key
+    og_image_key = excluded.og_image_key,
+    nsfw_label = excluded.nsfw_label,
+    nsfw_score = excluded.nsfw_score,
+    nsfw_categories = excluded.nsfw_categories,
+    nsfw_classified_at = excluded.nsfw_classified_at
 `)
 
 const updateImageStmt = db.prepare(`
@@ -129,7 +137,20 @@ const updateImageStmt = db.prepare(`
     og_image = ?,
     screenshot_key = ?,
     og_image_key = ?,
+    nsfw_label = COALESCE(?, nsfw_label),
+    nsfw_score = COALESCE(?, nsfw_score),
+    nsfw_categories = COALESCE(?, nsfw_categories),
+    nsfw_classified_at = COALESCE(?, nsfw_classified_at),
     error = ?
+  WHERE domain = ?
+`)
+
+const updateNsfwStmt = db.prepare(`
+  UPDATE scans SET
+    nsfw_label = ?,
+    nsfw_score = ?,
+    nsfw_categories = ?,
+    nsfw_classified_at = ?
   WHERE domain = ?
 `)
 
@@ -159,6 +180,19 @@ export interface ScanRow {
   /** ImageKit path for the upstream og:image, re-uploaded so the dashboard can render
    *  it through the same provider as the screenshot. */
   og_image_key: string | null
+  /** NSFW classification of the screenshot bytes. Null = unclassified (model unavailable,
+   *  classification failed, or the row pre-dates classification). 'suggestive' renders
+   *  normally on-site; 'nsfw' gets blurred with a click-to-reveal control. */
+  nsfw_label: 'safe' | 'suggestive' | 'nsfw' | null
+  /** Dominant-category score from nsfwjs, 0..1. Useful for tuning thresholds; not
+   *  rendered. */
+  nsfw_score: number | null
+  /** JSON-stringified `{ Drawing, Hentai, Neutral, Porn, Sexy }` of raw nsfwjs scores,
+   *  or `{ skipped: 'too-large', bytes: N }` when the image was too large to classify
+   *  safely. */
+  nsfw_categories: string | null
+  /** When classification last ran (ms). */
+  nsfw_classified_at: number | null
 }
 
 export function recordDomainSeen(domain: string): void {
@@ -184,6 +218,10 @@ export function recordRescanImage(input: {
   ogImage: string | null
   screenshotKey: string | null
   ogImageKey: string | null
+  nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null
+  nsfwScore: number | null
+  nsfwCategories: string | null
+  nsfwClassifiedAt: number | null
   error: string | null
 }): void {
   updateImageStmt.run(
@@ -194,7 +232,31 @@ export function recordRescanImage(input: {
     input.ogImage,
     input.screenshotKey,
     input.ogImageKey,
+    input.nsfwLabel,
+    input.nsfwScore,
+    input.nsfwCategories,
+    input.nsfwClassifiedAt,
     input.error,
+    input.domain,
+  )
+}
+
+/**
+ * Standalone NSFW classification update for the backfill script. Overwrites all four
+ * NSFW columns unconditionally (unlike `recordRescanImage` which uses COALESCE) since
+ * the caller has just computed fresh values.
+ */
+export function recordNsfwClassification(input: {
+  domain: string
+  nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null
+  nsfwScore: number | null
+  nsfwCategories: string | null
+}): void {
+  updateNsfwStmt.run(
+    input.nsfwLabel,
+    input.nsfwScore,
+    input.nsfwCategories,
+    Date.now(),
     input.domain,
   )
 }
@@ -215,6 +277,10 @@ export function recordScan(row: Omit<ScanRow, 'scanned_at'> & { scanned_at?: num
     row.error,
     row.screenshot_key,
     row.og_image_key,
+    row.nsfw_label,
+    row.nsfw_score,
+    row.nsfw_categories,
+    row.nsfw_classified_at,
   )
 }
 

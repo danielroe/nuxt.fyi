@@ -16,9 +16,11 @@
   },
   "dependencies": {
     "@imagekit/nodejs": "^7.6.2",
+    "@tensorflow/tfjs-node": "^4.22.0",
     "consola": "^3.4.0",
     "h3": "^2.0.1-rc.22",
     "nitro": "^3.0.260522-beta",
+    "nsfwjs": "^4.3.0",
     "playwright": "^1.49.0"
   },
   "devDependencies": {

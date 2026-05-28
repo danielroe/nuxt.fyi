@@ -44,6 +44,22 @@ pnpm dev:dashboard
 
 Set `VERBOSE=1` to log every post the daemon sees.
 
+## NSFW classification
+
+Screenshots are classified with [nsfwjs](https://github.com/infinitered/nsfwjs) on the
+scanner machine at capture time. Each row gets one of three labels:
+
+- `safe` (default): renders normally everywhere.
+- `suggestive`: renders normally on the dashboard; Bluesky posts get a `sexual` self-label
+  so users can opt to blur via their account preferences.
+- `nsfw`: dashboard blurs the image with a click-to-reveal overlay; Bluesky posts get a
+  `porn` self-label; Discord posts attach the image as a `SPOILER_*` file rather than
+  rendering inline in the embed.
+
+Thresholds are tunable via `NSFW_PORN_THRESHOLD` (default 0.5) and `NSFW_SEXY_THRESHOLD`
+(default 0.6) on the scanner. After tweaking, re-run the backfill with `--reclassify` to
+relabel historical rows.
+
 ## Architecture
 
 Three processes split across two Fly apps:
@@ -67,6 +83,26 @@ the dashboard can render them through `@nuxt/image` with on-the-fly resizing. Im
 optional: if `IMAGEKIT_URL_ENDPOINT` / `IMAGEKIT_PRIVATE_KEY` are unset, uploads are
 skipped and the dashboard falls back to streaming the daemon's local screenshot directory
 via `/api/screenshots/<domain>`.
+
+## Backfill scripts
+
+Three one-off scripts on the daemon side, all idempotent and safe to re-run:
+
+```bash
+# Upload pre-ImageKit local screenshots + upstream og:images to ImageKit.
+pnpm backfill-imagekit --concurrency=3
+
+# Rescan Nuxt-confirmed rows missing screenshot_key, og_image_key, or both.
+# Uses the live scanner; ignores RESCAN_AFTER_MS.
+pnpm backfill-images --concurrency=2
+
+# NSFW-classify every row that has an image but no nsfw_label. Calls the scanner's
+# /classify endpoint. Add --reclassify after threshold tweaks to relabel all rows.
+pnpm backfill-nsfw --concurrency=2
+```
+
+All three support `--limit=N` and `--dry-run`. The image-related ones expect ImageKit
+and (where relevant) scanner secrets in the environment.
 
 ## Admin CLI
 

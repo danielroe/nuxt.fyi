@@ -6,6 +6,9 @@ hoistPattern:
   - '!h3'
 allowBuilds:
   '@parcel/watcher': true
+  '@tensorflow/tfjs-node': true
+  # core-js postinstall is just a sponsorship banner; safe to skip.
+  core-js: false
   esbuild: true
   sharp: true
 minimumReleaseAgeExclude:

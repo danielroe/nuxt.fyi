@@ -97,6 +97,22 @@ export async function notifyBluesky(outcome: ScanOutcome): Promise<boolean> {
   }
   if (rt.facets) post.facets = rt.facets
 
+  // Self-label NSFW posts via Bluesky's standard moderation labels. Users opt in/out of
+  // seeing each label via their account preferences; we apply the label and let their
+  // client decide whether to blur, hide, or show. `nsfw` -> `porn` (Adult content);
+  // `suggestive` -> `sexual` (Sexually suggestive).
+  const labelValue = outcome.nsfwLabel === 'nsfw'
+    ? 'porn'
+    : outcome.nsfwLabel === 'suggestive'
+      ? 'sexual'
+      : null
+  if (labelValue) {
+    post.labels = {
+      $type: 'com.atproto.label.defs#selfLabels',
+      values: [{ val: labelValue }],
+    }
+  }
+
   try {
     await a.post(post as Parameters<typeof a.post>[0])
     return true

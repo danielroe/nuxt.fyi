@@ -105,7 +105,12 @@ async function doUpload(
  * anyway. Returns the bucket-relative path on success, null otherwise.
  */
 const OG_FETCH_TIMEOUT_MS = 10_000
-const OG_MAX_BYTES = 10 * 1024 * 1024
+/**
+ * ImageKit's free tier caps individual files at 25MB. 20MB gives us headroom for
+ * content-type misreporting and avoids edge cases at the boundary. Oversized og:images
+ * are logged and skipped rather than failing the scan.
+ */
+const OG_MAX_BYTES = 20 * 1024 * 1024
 
 export async function uploadOgImage(domain: string, ogImageUrl: string): Promise<UploadOk | null> {
   if (!imagekitEnabled()) return null

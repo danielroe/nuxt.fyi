@@ -40,6 +40,13 @@ export interface UploadOk {
 }
 
 /**
+ * ImageKit free tier caps single files at 25MB. Our 1280x800 quality-80 JPEGs are ~80-
+ * 150KB so this is purely defence-in-depth (a future viewport bump or fullPage=true
+ * change could blow past it).
+ */
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+
+/**
  * Uploads a screenshot JPEG buffer to ImageKit at `<rootFolder>/screenshots/<domain>.jpg`.
  * Same path scheme the daemon used before the scanner was extracted, so existing dashboard
  * URLs and backfill rows keep resolving. Returns null on any failure or when the SDK is
@@ -50,6 +57,10 @@ export async function uploadScreenshot(
   bytes: Buffer,
   cfg: ImagekitConfig,
 ): Promise<UploadOk | null> {
+  if (bytes.byteLength > MAX_UPLOAD_BYTES) {
+    log.warn(`screenshot for ${domain} is ${bytes.byteLength} bytes; skipping upload`)
+    return null
+  }
   const c = getClient(cfg)
   if (!c) return null
   try {

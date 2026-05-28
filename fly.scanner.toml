@@ -18,6 +18,10 @@ primary_region = "lhr"
   HOST = "::"
   IMAGEKIT_ROOT_FOLDER = "/nuxt-fyi"
   IMAGEKIT_URL_ENDPOINT = "https://ik.imagekit.io/roe"
+  # NSFW classification thresholds (nsfwjs probabilities, 0..1). Tweak by editing here +
+  # redeploying, then re-run `pnpm backfill-nsfw --reclassify` to relabel history.
+  NSFW_PORN_THRESHOLD = "0.5"
+  NSFW_SEXY_THRESHOLD = "0.6"
   # Secrets (set via `fly secrets set -a nuxt-fyi-scanner`):
   #   IMAGEKIT_PRIVATE_KEY
   #   SCANNER_TOKEN  (must match the daemon's secret with the same name)

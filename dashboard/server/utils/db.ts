@@ -45,6 +45,10 @@ export interface ScanRow {
   og_image: string | null
   screenshot_key: string | null
   og_image_key: string | null
+  nsfw_label: 'safe' | 'suggestive' | 'nsfw' | null
+  nsfw_score: number | null
+  nsfw_categories: string | null
+  nsfw_classified_at: number | null
   redirected_to: string | null
   error: string | null
 }

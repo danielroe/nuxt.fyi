@@ -3,6 +3,7 @@ import { readBody } from 'h3'
 import { consola } from 'consola'
 import { screenshot } from '../src/headless.ts'
 import { uploadScreenshot } from '../src/imagekit.ts'
+import { classify, type NsfwLabel } from '../src/nsfw.ts'
 
 const log = consola.withTag('capture')
 
@@ -18,7 +19,16 @@ interface CaptureResponse {
   height: number
   bytes: number
   capturedAt: number
+  nsfw: {
+    label: NsfwLabel
+    score: number | null
+    categories: Record<string, unknown>
+  } | null
   error: string | null
+}
+
+function widen(cats: object): Record<string, unknown> {
+  return { ...cats } as Record<string, unknown>
 }
 
 const SCANNER_TOKEN = process.env.SCANNER_TOKEN || ''
@@ -32,11 +42,12 @@ if (!SCANNER_TOKEN) {
 }
 
 /**
- * Captures a screenshot of `url`, uploads it to ImageKit, and returns the bucket path.
- * Both fields can come back null when their step failed independently — the daemon
- * decides whether that's acceptable (e.g. a missing screenshot still leaves the og:image
- * as a fallback). Auth is a static bearer token shared between daemon and scanner via
- * the `SCANNER_TOKEN` env var on both apps.
+ * Captures a screenshot of `url`, classifies the bytes via nsfwjs, then uploads to
+ * ImageKit. NSFW classification doesn't gate the upload: the dashboard wants the bytes
+ * available regardless of label so it can render a blurred placeholder. All three steps
+ * are independently fallible; partial failures still return the parts that succeeded.
+ * Auth is a static bearer token shared between daemon and scanner via the
+ * `SCANNER_TOKEN` env var on both apps.
  */
 export default defineHandler(async (event): Promise<CaptureResponse> => {
   const auth = event.req.headers.get('authorization') || ''
@@ -62,12 +73,16 @@ export default defineHandler(async (event): Promise<CaptureResponse> => {
   const startedAt = Date.now()
   try {
     const shot = await screenshot(body.url, body.domain, SCREENSHOT_BUDGET_MS)
-    const uploaded = await uploadScreenshot(body.domain, shot.bytes, {
-      urlEndpoint: IMAGEKIT_URL_ENDPOINT,
-      privateKey: IMAGEKIT_PRIVATE_KEY,
-      rootFolder: IMAGEKIT_ROOT_FOLDER,
-    })
-    log.info(`${body.domain} captured (${shot.bytes.byteLength} bytes, ${Date.now() - startedAt}ms) ik=${uploaded ? 'yes' : 'no'}`)
+    // Classify and upload in parallel: independent operations on the same buffer.
+    const [nsfw, uploaded] = await Promise.all([
+      classify(shot.bytes),
+      uploadScreenshot(body.domain, shot.bytes, {
+        urlEndpoint: IMAGEKIT_URL_ENDPOINT,
+        privateKey: IMAGEKIT_PRIVATE_KEY,
+        rootFolder: IMAGEKIT_ROOT_FOLDER,
+      }),
+    ])
+    log.info(`${body.domain} captured (${shot.bytes.byteLength} bytes, ${Date.now() - startedAt}ms) ik=${uploaded ? 'yes' : 'no'} nsfw=${nsfw?.label ?? 'unknown'}`)
     return {
       imageKey: uploaded?.filePath ?? null,
       imageUrl: uploaded?.url ?? null,
@@ -75,6 +90,7 @@ export default defineHandler(async (event): Promise<CaptureResponse> => {
       height: shot.height,
       bytes: shot.bytes.byteLength,
       capturedAt: Date.now(),
+      nsfw: nsfw ? { label: nsfw.label, score: nsfw.score, categories: widen(nsfw.categories) } : null,
       error: uploaded ? null : 'imagekit upload failed',
     }
   }
@@ -89,6 +105,7 @@ export default defineHandler(async (event): Promise<CaptureResponse> => {
       height: 0,
       bytes: 0,
       capturedAt: Date.now(),
+      nsfw: null,
       error: `screenshot: ${message}`,
     }
   }
@@ -102,6 +119,7 @@ function errorResponse(message: string): CaptureResponse {
     height: 0,
     bytes: 0,
     capturedAt: Date.now(),
+    nsfw: null,
     error: message,
   }
 }

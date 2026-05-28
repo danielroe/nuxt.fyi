@@ -21,6 +21,10 @@ export function persistOutcome(outcome: ScanOutcome): void {
     og_image: outcome.ogImage,
     screenshot_key: outcome.screenshotKey,
     og_image_key: outcome.ogImageKey,
+    nsfw_label: outcome.nsfwLabel,
+    nsfw_score: outcome.nsfwScore,
+    nsfw_categories: outcome.nsfwCategories,
+    nsfw_classified_at: outcome.nsfwClassifiedAt,
     redirected_to: outcome.redirectedTo,
     error: outcome.error,
   })
