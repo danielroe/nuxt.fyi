@@ -1,5 +1,4 @@
 import { defineHandler } from 'nitro'
-import { useRuntimeConfig } from 'nitro/runtime-config'
 import { readBody } from 'h3'
 import { consola } from 'consola'
 import { screenshot } from '../src/headless.ts'
@@ -22,6 +21,16 @@ interface CaptureResponse {
   error: string | null
 }
 
+const SCANNER_TOKEN = process.env.SCANNER_TOKEN || ''
+const IMAGEKIT_URL_ENDPOINT = process.env.IMAGEKIT_URL_ENDPOINT || ''
+const IMAGEKIT_PRIVATE_KEY = process.env.IMAGEKIT_PRIVATE_KEY || ''
+const IMAGEKIT_ROOT_FOLDER = process.env.IMAGEKIT_ROOT_FOLDER || '/nuxt-fyi'
+const SCREENSHOT_BUDGET_MS = Number(process.env.SCREENSHOT_BUDGET_MS) || 60_000
+
+if (!SCANNER_TOKEN) {
+  log.warn('SCANNER_TOKEN is empty; every /capture request will 401')
+}
+
 /**
  * Captures a screenshot of `url`, uploads it to ImageKit, and returns the bucket path.
  * Both fields can come back null when their step failed independently — the daemon
@@ -30,11 +39,9 @@ interface CaptureResponse {
  * the `SCANNER_TOKEN` env var on both apps.
  */
 export default defineHandler(async (event): Promise<CaptureResponse> => {
-  const config = useRuntimeConfig()
-
   const auth = event.req.headers.get('authorization') || ''
-  const expected = `Bearer ${config.scannerToken}`
-  if (!config.scannerToken || auth !== expected) {
+  const expected = `Bearer ${SCANNER_TOKEN}`
+  if (!SCANNER_TOKEN || auth !== expected) {
     event.res.status = 401
     return errorResponse('unauthorised')
   }
@@ -54,11 +61,11 @@ export default defineHandler(async (event): Promise<CaptureResponse> => {
 
   const startedAt = Date.now()
   try {
-    const shot = await screenshot(body.url, body.domain, config.screenshotBudgetMs)
+    const shot = await screenshot(body.url, body.domain, SCREENSHOT_BUDGET_MS)
     const uploaded = await uploadScreenshot(body.domain, shot.bytes, {
-      urlEndpoint: config.imagekitUrlEndpoint,
-      privateKey: config.imagekitPrivateKey,
-      rootFolder: config.imagekitRootFolder,
+      urlEndpoint: IMAGEKIT_URL_ENDPOINT,
+      privateKey: IMAGEKIT_PRIVATE_KEY,
+      rootFolder: IMAGEKIT_ROOT_FOLDER,
     })
     log.info(`${body.domain} captured (${shot.bytes.byteLength} bytes, ${Date.now() - startedAt}ms) ik=${uploaded ? 'yes' : 'no'}`)
     return {

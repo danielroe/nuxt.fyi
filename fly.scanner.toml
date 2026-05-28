@@ -10,6 +10,7 @@ primary_region = "lhr"
 [deploy]
   strategy = "immediate"
   wait_timeout = "5m"
+  min_machines_running = 1
 
 [env]
   NODE_ENV = "production"
