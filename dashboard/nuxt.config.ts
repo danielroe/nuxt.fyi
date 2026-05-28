@@ -12,13 +12,13 @@ export default defineNuxtConfig({
   runtimeConfig: {
     dataDir: '../data',
     screenshotDir: '../screenshots',
-    public: {
-      imagekitEndpoint: process.env.NUXT_PUBLIC_IMAGEKIT_ENDPOINT || '',
-    },
   },
   image: {
     imagekit: {
-      baseURL: process.env.NUXT_PUBLIC_IMAGEKIT_ENDPOINT || 'https://ik.imagekit.io/missing',
+      // The endpoint is a public identifier (visible in every delivered image URL), so
+      // there's nothing to hide behind an env var. Hardcoding it here means it gets baked
+      // into the build output without any Docker-arg plumbing.
+      baseURL: 'https://ik.imagekit.io/roe',
     },
   },
   experimental: {

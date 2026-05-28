@@ -27,7 +27,6 @@ primary_region = "lhr"
   HOST = "0.0.0.0"
   IMAGEKIT_ROOT_FOLDER = "/nuxt-fyi"
   IMAGEKIT_URL_ENDPOINT = "https://ik.imagekit.io/roe"
-  NUXT_PUBLIC_IMAGEKIT_ENDPOINT = "https://ik.imagekit.io/roe"
   IMAGEKIT_PUBLIC_KEY = "public_DPbHLvCrVGJ4uuIvSoQnorujSv0="
   # IMAGEKIT_PRIVATE_KEY is set via `fly secrets set` and never lives in this file.
   SCANNER_URL = "http://nuxt-fyi-scanner.internal:3000"
