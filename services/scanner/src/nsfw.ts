@@ -1,3 +1,7 @@
+// MUST be the first import in this file: patches `util.isNullOrUndefined` (removed in
+// Node 22, still called by tfjs-node 4.x) before tfjs-node's module graph captures the
+// missing reference. See polyfill-util.ts for the upstream issue.
+import './polyfill-util.ts'
 import * as tf from '@tensorflow/tfjs-node'
 import * as nsfwjs from 'nsfwjs'
 import { consola } from 'consola'
