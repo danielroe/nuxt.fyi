@@ -1,6 +1,9 @@
 packages:
   - 'services/*'
   - 'dashboard'
+hoistPattern:
+  - '*'
+  - '!h3'
 allowBuilds:
   '@parcel/watcher': true
   esbuild: true
