@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { config } from './config.ts'
 
@@ -8,6 +8,9 @@ mkdirSync(config.dataDir, { recursive: true })
 export const DB_PATH = join(config.dataDir, 'nuxt-fyi.db')
 export const db = new DatabaseSync(DB_PATH)
 
+// Hard cap on the WAL file size
+const WAL_SIZE_LIMIT_BYTES = 64 * 1024 * 1024
+
 // WAL lets readers and the single writer run concurrently; NORMAL synchronous is the
 // recommended pairing (durable across process crashes, not across power loss).
 db.exec(`
@@ -15,10 +18,22 @@ db.exec(`
   PRAGMA synchronous = NORMAL;
   PRAGMA busy_timeout = 30000;
   PRAGMA wal_autocheckpoint = 4000;
+  PRAGMA journal_size_limit = ${WAL_SIZE_LIMIT_BYTES};
 `)
+
+const WAL_PATH = `${DB_PATH}-wal`
+/** Threshold above which the periodic checkpoint loop warns. Set well below the hard
+ *  `journal_size_limit` cap so we get early warning before SQLite has to force a
+ *  truncation. */
+const WAL_WARN_BYTES = 32 * 1024 * 1024
 
 const WAL_TRUNCATE_INTERVAL_MS = 60_000
 function truncateWal(): void {
+  let walBytes = 0
+  try { walBytes = statSync(WAL_PATH).size } catch { /* WAL not created yet */ }
+  if (walBytes > WAL_WARN_BYTES) {
+    console.warn(`[store] WAL is ${Math.round(walBytes / 1024 / 1024)}MB before checkpoint; a long-lived reader may be blocking the checkpoint loop`)
+  }
   try {
     db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
   }
