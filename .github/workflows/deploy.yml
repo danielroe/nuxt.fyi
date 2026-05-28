@@ -26,9 +26,21 @@ jobs:
       - run: pnpm -r run test:types
       - run: pnpm test
       - run: pnpm --filter nuxt-fyi-dashboard build
+      - run: pnpm --filter @nuxt-fyi/scanner build
+
+  deploy-scanner:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+      - run: flyctl deploy --remote-only --config fly.scanner.toml
 
   deploy:
-    needs: test
+    needs: deploy-scanner
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -38,7 +50,7 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
 
-      # Snapshot the data volume before deploying.
+      # Snapshot the data volume before deploying
       - name: snapshot data volume
         continue-on-error: true
         run: |
