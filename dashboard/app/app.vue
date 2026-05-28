@@ -5,6 +5,18 @@ const home: RouteLocationRaw = { name: 'index' }
 const hitsList: RouteLocationRaw = { name: 'hits-list', params: {} }
 const recent: RouteLocationRaw = { name: 'recent', params: {} }
 
+// Apply the user's image preference as an `image-mode-*` class on <html> before any
+// other JS runs.
+onPrehydrate(() => {
+  try {
+    const stored = localStorage.getItem('nuxt-fyi:image-mode')
+    if (stored === 'screenshot' || stored === 'og') {
+      document.documentElement.classList.add('image-mode-' + stored)
+    }
+  }
+  catch { /* localStorage unavailable: leave default (auto) */ }
+})
+
 const mainRef = ref<HTMLElement | null>(null)
 const router = useRouter()
 
@@ -28,6 +40,7 @@ router.afterEach((to, from) => {
         <NuxtLink :to="hitsList">nuxt sites</NuxtLink>
         <NuxtLink :to="recent">recent domains</NuxtLink>
       </nav>
+      <ImageModePicker />
       <a class="external header-external" href="https://github.com/danielroe/nuxt.fyi" target="_blank" rel="noopener">
         github<span class="sr-only"> (opens in a new tab)</span>
       </a>
