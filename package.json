@@ -12,6 +12,7 @@
     "dev": "pnpm --filter @nuxt-fyi/daemon dev",
     "dev:dashboard": "pnpm --filter nuxt-fyi-dashboard dev",
     "probe": "pnpm --filter @nuxt-fyi/daemon probe",
+    "rescan": "pnpm --filter @nuxt-fyi/daemon rescan",
     "stats": "pnpm --filter @nuxt-fyi/daemon stats",
     "test": "pnpm -r --workspace-concurrency=1 test",
     "test:types": "pnpm -r test:types",

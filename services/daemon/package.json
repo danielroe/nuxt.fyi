@@ -10,6 +10,7 @@
     "start": "node --env-file-if-exists=../../.env src/index.ts",
     "dev": "node --watch --env-file-if-exists=../../.env src/index.ts",
     "probe": "node --env-file-if-exists=../../.env src/cli/probe.ts",
+    "rescan": "node --env-file-if-exists=../../.env src/cli/rescan.ts",
     "stats": "node --env-file-if-exists=../../.env src/cli/stats.ts",
     "test": "node --test 'src/**/*.test.ts'",
     "test:types": "tsc --noEmit",

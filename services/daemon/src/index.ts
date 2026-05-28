@@ -18,36 +18,10 @@ function runIngestScript(scriptName: string, label: string): Promise<void> {
   })
 }
 import { Queue } from './queue.ts'
-import {
-  getScan,
-  hasNotified,
-  recordDomainSeen,
-  recordNotification,
-  recordScan,
-} from './store.ts'
-import { scanDomain, type ScanOutcome } from './scan/index.ts'
+import { getScan, recordDomainSeen } from './store.ts'
+import { scanDomain } from './scan/index.ts'
 import { closeBrowser } from './scan/headless.ts'
-import { notifyDiscord } from './notify/discord.ts'
-import { notifyBluesky } from './notify/bluesky.ts'
-
-async function dispatchNotifications(outcome: ScanOutcome): Promise<void> {
-  const channels: Array<{ name: string, post: (o: ScanOutcome) => Promise<boolean> }> = [
-    { name: 'discord', post: notifyDiscord },
-    { name: 'bluesky', post: notifyBluesky },
-  ]
-  for (const { name, post } of channels) {
-    if (hasNotified(outcome.domain, name)) continue
-    try {
-      const posted = await post(outcome)
-      if (posted) {
-        recordNotification(outcome.domain, name)
-        log.success(`[${name}] posted ${outcome.domain}`)
-      }
-    } catch (err) {
-      log.error(`[${name}] failed to post ${outcome.domain}:`, (err as Error).message)
-    }
-  }
-}
+import { dispatchNotifications, persistOutcome } from './pipeline.ts'
 
 interface ScanJob {
   domain: string
@@ -97,22 +71,6 @@ async function handleScan({ domain }: ScanJob): Promise<void> {
     // The persistent scan record gates re-work; safe to let the queue forget this key.
     queue.forget({ domain })
   }
-}
-
-function persistOutcome(outcome: ScanOutcome): void {
-  recordScan({
-    domain: outcome.domain,
-    is_nuxt: outcome.detection.isNuxt ? 1 : 0,
-    nuxt_version: outcome.detection.nuxtVersion,
-    confidence: outcome.detection.confidence,
-    signals: JSON.stringify(outcome.detection.signals),
-    final_url: outcome.finalUrl,
-    title: outcome.title,
-    screenshot_path: outcome.screenshotPath,
-    og_image: outcome.ogImage,
-    redirected_to: outcome.redirectedTo,
-    error: outcome.error,
-  })
 }
 
 const controller = new AbortController()

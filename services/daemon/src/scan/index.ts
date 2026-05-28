@@ -32,7 +32,7 @@ const OG_IMAGE_HEAD_TIMEOUT_MS = 5_000
  * dashboard <img>) can trust the URL without their own validation. Returns the validated
  * URL on success or null on any failure mode (network error, non-2xx, non-image type).
  */
-async function validateOgImage(url: string): Promise<string | null> {
+export async function validateOgImage(url: string): Promise<string | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), OG_IMAGE_HEAD_TIMEOUT_MS)
   try {
@@ -196,5 +196,54 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
     screenshotPath,
     ogImage,
     error: screenshotError,
+  }
+}
+
+export interface RecaptureOutcome {
+  ogImage: string | null
+  screenshotPath: string | null
+  finalUrl: string
+  title: string | null
+  description: string | null
+  error: string | null
+}
+
+/**
+ * Refreshes just the image bits of an existing hit: re-fetches HTML to find the current
+ * og:image and recaptures the screenshot. Detection signals, confidence and version are
+ * untouched; the caller is expected to be operating on a domain already classified as
+ * Nuxt. Returns the new image fields plus the live HTML metadata (title, description)
+ * so the caller can decide whether to update those too.
+ */
+export async function recaptureImage(domain: string): Promise<RecaptureOutcome> {
+  const url = `https://${domain}/`
+  const html = await scanHtml(url)
+
+  let ogImage: string | null = null
+  let screenshotPath: string | null = null
+  let error: string | null = null
+
+  if (html.ogImage) {
+    ogImage = await validateOgImage(html.ogImage)
+    if (ogImage) log.debug(`[recapture] ${domain} og:image ok: ${ogImage}`)
+    else log.debug(`[recapture] ${domain} og:image rejected (${html.ogImage})`)
+  }
+  if (!ogImage) {
+    try {
+      screenshotPath = await screenshot(html.finalUrl, domain)
+    }
+    catch (err) {
+      error = `screenshot: ${(err as Error).message}`
+      log.warn(`[recapture] ${domain} screenshot failed: ${(err as Error).message}`)
+    }
+  }
+
+  return {
+    ogImage,
+    screenshotPath,
+    finalUrl: html.finalUrl,
+    title: html.title,
+    description: html.description,
+    error,
   }
 }

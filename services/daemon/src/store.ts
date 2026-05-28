@@ -101,6 +101,17 @@ const upsertScanStmt = db.prepare(`
     error = excluded.error
 `)
 
+const updateImageStmt = db.prepare(`
+  UPDATE scans SET
+    scanned_at = ?,
+    final_url = ?,
+    title = COALESCE(?, title),
+    screenshot_path = ?,
+    og_image = ?,
+    error = ?
+  WHERE domain = ?
+`)
+
 const hasNotifiedStmt = db.prepare(`SELECT 1 FROM notifications WHERE domain = ? AND channel = ?`)
 const recordNotificationStmt = db.prepare(`
   INSERT OR REPLACE INTO notifications (domain, channel, posted_at) VALUES (?, ?, ?)
@@ -130,6 +141,31 @@ export function recordDomainSeen(domain: string): void {
 
 export function getScan(domain: string): ScanRow | undefined {
   return getScanStmt.get(domain) as ScanRow | undefined
+}
+
+/**
+ * Partial update for the image columns only. Detection results (is_nuxt, nuxt_version,
+ * confidence, signals) are deliberately left alone so a `--screenshot-only` rescan can't
+ * accidentally flip a previously confirmed Nuxt hit because the site has since changed.
+ * Title is updated only when the new fetch returned one; existing titles aren't blanked.
+ */
+export function recordRescanImage(input: {
+  domain: string
+  finalUrl: string
+  title: string | null
+  screenshotPath: string | null
+  ogImage: string | null
+  error: string | null
+}): void {
+  updateImageStmt.run(
+    Date.now(),
+    input.finalUrl,
+    input.title,
+    input.screenshotPath,
+    input.ogImage,
+    input.error,
+    input.domain,
+  )
 }
 
 export function recordScan(row: Omit<ScanRow, 'scanned_at'> & { scanned_at?: number }): void {

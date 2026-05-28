@@ -41,6 +41,22 @@ pnpm dev:dashboard
 
 Set `VERBOSE=1` to log every post the daemon sees.
 
+## Admin CLI
+
+On the running Fly machine (`fly ssh console -C bash`), you can re-scan one or more
+domains against the live database:
+
+```bash
+cd /app
+node src/cli/rescan.ts example.com another.com
+
+# refresh only the screenshot/og:image on an existing Nuxt hit
+node src/cli/rescan.ts --screenshot-only example.com
+
+# suppress Discord + Bluesky posts even when the domain is newly detected as Nuxt
+node src/cli/rescan.ts --no-notify example.com
+```
+
 ## Credits
 
 Detection heuristics and the GTM consent-cookie trick are lifted from [`nuxtlabs/vue-telescope-analyzer`](https://github.com/nuxtlabs/vue-telescope-analyzer) ❤️
