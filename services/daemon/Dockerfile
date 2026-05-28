@@ -12,13 +12,12 @@ COPY dashboard/package.json dashboard/
 
 RUN pnpm fetch
 
-# Split deps install into two stages so the daemon image doesn't need Nuxt's devDeps.
-
-# --- daemon: production deps only ---
-FROM workspace AS daemon-deps
+FROM workspace AS daemon-deploy
 
 ENV CI=true
-RUN pnpm install --filter @nuxt-fyi/daemon --prod --frozen-lockfile --ignore-scripts --offline
+COPY services/daemon/ ./services/daemon/
+RUN pnpm install --frozen-lockfile --ignore-scripts --offline \
+ && pnpm --filter @nuxt-fyi/daemon --prod deploy --legacy /deploy/daemon
 
 # --- dashboard: install + build ---
 FROM workspace AS dashboard-build
@@ -39,16 +38,12 @@ ENV NUXT_SCREENSHOT_DIR=/data/screenshots
 WORKDIR /app
 RUN corepack enable
 
-COPY --from=daemon-deps /repo/node_modules ./node_modules
-COPY services/daemon/package.json ./
-COPY services/daemon/scripts ./scripts
+COPY --from=daemon-deploy /deploy/daemon/ ./
+
 # curl/unzip stay for the runtime Tranco/nuxt-versions ingest.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl unzip \
  && rm -rf /var/lib/apt/lists/*
-
-COPY services/daemon/src ./src
-COPY services/daemon/tsconfig.json ./
 
 # Nitro's standalone output bundles its own node_modules; no install needed at runtime.
 COPY --from=dashboard-build /repo/dashboard/.output ./dashboard/.output
