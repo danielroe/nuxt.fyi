@@ -60,7 +60,14 @@ export async function remoteCapture(url: string, domain: string): Promise<Remote
     return result
   }
   catch (err) {
-    log.warn(`[scanner] ${domain} request failed: ${(err as Error).message}`)
+    const e = err as Error & { cause?: { code?: string, message?: string } }
+    if (e.name === 'AbortError') {
+      log.warn(`[scanner] ${domain} request timed out after ${HTTP_TIMEOUT_MS}ms`)
+    }
+    else {
+      const cause = e.cause?.code ? `${e.cause.code}: ${e.cause.message ?? ''}` : e.cause?.message ?? e.message
+      log.warn(`[scanner] ${domain} request failed: ${cause}`)
+    }
     return null
   }
   finally {
