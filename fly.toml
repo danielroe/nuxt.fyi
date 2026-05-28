@@ -30,8 +30,7 @@ primary_region = "lhr"
   NUXT_PUBLIC_IMAGEKIT_ENDPOINT = "https://ik.imagekit.io/roe"
   IMAGEKIT_PUBLIC_KEY = "public_DPbHLvCrVGJ4uuIvSoQnorujSv0="
   # IMAGEKIT_PRIVATE_KEY is set via `fly secrets set` and never lives in this file.
-  # The daemon talks to the screenshot service over Fly private networking.
-  SCANNER_URL = "http://nuxt-fyi-scanner.flycast:3000"
+  SCANNER_URL = "http://nuxt-fyi-scanner.internal:3000"
   # SCANNER_TOKEN is set via `fly secrets set -a nuxt-fyi` and must match the secret of
   # the same name on the nuxt-fyi-scanner app.
 

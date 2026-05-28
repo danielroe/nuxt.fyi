@@ -26,7 +26,7 @@ FROM node:24-bookworm-slim AS runtime
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV HOST=0.0.0.0
+ENV HOST=::
 ENV EXTENSION_DIR=/app/services/scanner/vendor/isdcac
 
 WORKDIR /app

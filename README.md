@@ -51,9 +51,9 @@ Three processes split across two Fly apps:
 - `nuxt-fyi` (this `fly.toml`): daemon (Jetstream consumer + detection) and dashboard
   (Nuxt 4) in one container, sharing the SQLite volume at `/data`.
 - `nuxt-fyi-scanner` (`fly.scanner.toml`): Nitro v3 service that owns Playwright + the
-  screenshot half of the ImageKit upload. Scales to zero when idle; the daemon's HTTP
-  client warms it on the next confirmed Nuxt hit. No public ingress; daemon reaches it
-  on `nuxt-fyi-scanner.flycast:3000` via Fly private networking.
+  screenshot half of the ImageKit upload. No public ingress; daemon reaches it on
+  `nuxt-fyi-scanner.internal:3000` via Fly's 6PN private networking. Stays always-on at
+  `shared-cpu-2x` because `.internal` doesn't wake stopped machines.
 - ImageKit: external CDN for screenshots + og:images.
 
 The daemon talks to the scanner via an authenticated HTTP call (`SCANNER_TOKEN` shared
