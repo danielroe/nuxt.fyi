@@ -1,0 +1,48 @@
+# Screenshot + (TODO) NSFW classification service. Called by the daemon over
+# Fly private networking; no public ingress. Scales to zero when idle and cold-starts on
+# the daemon's next `/capture` request.
+
+app = "nuxt-fyi-scanner"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "services/scanner/Dockerfile"
+
+[deploy]
+  strategy = "immediate"
+  wait_timeout = "5m"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  HOST = "0.0.0.0"
+  IMAGEKIT_ROOT_FOLDER = "/nuxt-fyi"
+  IMAGEKIT_URL_ENDPOINT = "https://ik.imagekit.io/roe"
+  # Secrets (set via `fly secrets set -a nuxt-fyi-scanner`):
+  #   IMAGEKIT_PRIVATE_KEY
+  #   SCANNER_TOKEN  (must match the daemon's secret with the same name)
+
+# No [http_service] — the daemon reaches us at nuxt-fyi-scanner.flycast:3000 (or
+# nuxt-fyi-scanner.internal:3000) and we don't want public ingress. The [[services]]
+# block below registers the port with Fly's private networking only.
+[[services]]
+  internal_port = 3000
+  protocol = "tcp"
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[services.ports]]
+    port = 3000
+
+  [services.concurrency]
+    type = "requests"
+    hard_limit = 4
+    soft_limit = 2
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "4gb"
+
+[[restart]]
+  policy = "always"

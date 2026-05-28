@@ -7,6 +7,7 @@ RUN corepack enable
 # every package.json reachable so `pnpm install` can resolve the workspace graph.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY services/daemon/package.json services/daemon/
+COPY services/scanner/package.json services/scanner/
 COPY dashboard/package.json dashboard/
 
 RUN pnpm fetch
@@ -29,9 +30,8 @@ RUN pnpm --filter nuxt-fyi-dashboard build
 # --- runtime ---
 FROM node:24-bookworm-slim AS runtime
 
-# `playwright install --with-deps chromium` installs the browser binary and its apt deps
-# at build time so the runtime container has both baked in.
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+# Daemon image is intentionally lean after the scanner extraction: no Chromium, no
+# extension, no Playwright. The screenshot pipeline lives on the nuxt-fyi-scanner app.
 ENV NODE_ENV=production
 ENV NUXT_DATA_DIR=/data
 ENV NUXT_SCREENSHOT_DIR=/data/screenshots
@@ -39,16 +39,12 @@ ENV NUXT_SCREENSHOT_DIR=/data/screenshots
 WORKDIR /app
 RUN corepack enable
 
-# Daemon's hoisted node_modules end up in the workspace root after pnpm install. The
-# daemon process is launched from /app, so we place them there too.
 COPY --from=daemon-deps /repo/node_modules ./node_modules
 COPY services/daemon/package.json ./
 COPY services/daemon/scripts ./scripts
-# One apt cycle: Chromium runtime deps (via playwright), plus curl/unzip needed at build
-# (extension fetch) and runtime (periodic Tranco/nuxt-versions ingest).
-RUN node_modules/.bin/playwright install --with-deps chromium \
+# curl/unzip stay for the runtime Tranco/nuxt-versions ingest.
+RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl unzip \
- && node scripts/fetch-extension.mjs \
  && rm -rf /var/lib/apt/lists/*
 
 COPY services/daemon/src ./src

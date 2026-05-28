@@ -1,14 +1,18 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type BrowserContext } from 'playwright'
-import { config } from '../config.ts'
-import { log } from '../log.ts'
+import { consola } from 'consola'
 
-mkdirSync(config.screenshotDir, { recursive: true })
+const log = consola.withTag('headless')
 
-const EXTENSION_DIR = fileURLToPath(new URL('../../vendor/isdcac', import.meta.url))
+// In production the bundled Nitro output lives at `.output/server/` with the extension
+// copied separately into the image; the env var lets the Dockerfile point at the
+// absolute install location. In dev `import.meta.url` resolves to this file's location
+// and `../vendor/isdcac` (relative to `src/`) is the dev tree.
+const EXTENSION_DIR = process.env.EXTENSION_DIR
+  || fileURLToPath(new URL('../vendor/isdcac', import.meta.url))
 const EXTENSION_STAMP = join(EXTENSION_DIR, '.nuxt-fyi-stamp.json')
 const EXTENSION_MANIFEST = join(EXTENSION_DIR, 'manifest.json')
 const EXTENSION_AVAILABLE = existsSync(EXTENSION_MANIFEST) && existsSync(EXTENSION_STAMP)
@@ -17,15 +21,15 @@ if (!EXTENSION_AVAILABLE) {
   // The stamp file is only written after sha256 verification in scripts/fetch-extension.mjs;
   // refuse to load an extension dir without one.
   const msg = existsSync(EXTENSION_MANIFEST)
-    ? `[headless] extension at ${EXTENSION_DIR} has no integrity stamp; refusing to load. Run \`pnpm install-extension\` to refetch.`
-    : `[headless] extension not found at ${EXTENSION_DIR}. Run \`pnpm install-extension\` to fetch it.`
+    ? `extension at ${EXTENSION_DIR} has no integrity stamp; refusing to load. Run \`pnpm install-extension\` to refetch.`
+    : `extension not found at ${EXTENSION_DIR}. Run \`pnpm install-extension\` to fetch it.`
   if (process.env.NODE_ENV === 'production') throw new Error(msg)
   log.warn(msg)
 }
 else {
   try {
     const stamp = JSON.parse(readFileSync(EXTENSION_STAMP, 'utf8')) as { version: string, sha256: string }
-    log.info(`[headless] loaded I-Still-Dont-Care-About-Cookies v${stamp.version} (sha256 ${stamp.sha256.slice(0, 12)}…)`)
+    log.info(`loaded I-Still-Dont-Care-About-Cookies v${stamp.version} (sha256 ${stamp.sha256.slice(0, 12)}…)`)
   }
   catch { /* noop */ }
 }
@@ -55,7 +59,7 @@ async function launchContext(): Promise<BrowserContext> {
   contextAlive = true
   ctx.on('close', () => {
     contextAlive = false
-    log.warn('[headless] browser context closed unexpectedly; next scan will rebuild')
+    log.warn('browser context closed unexpectedly; next scan will rebuild')
   })
   return ctx
 }
@@ -67,7 +71,7 @@ async function getContext(): Promise<BrowserContext> {
       if (contextAlive) return ctx
     }
     catch (err) {
-      log.warn(`[headless] cached context rejected: ${(err as Error).message}; rebuilding`)
+      log.warn(`cached context rejected: ${(err as Error).message}; rebuilding`)
     }
     // Cached promise resolved to a dead context, or rejected outright. Tear down whatever
     // state remains and re-launch on this call.
@@ -120,26 +124,34 @@ const CONSENT_HIDE_CSS = `
   html, body { overflow: auto !important; }
 `
 
-/**
- * Overall budget for one screenshot pipeline (cookies, goto, banner sweep, capture).
- * Inner steps have their own shorter timeouts; this is the safety net that ensures we
- * never spend more than this on a single domain regardless of which step hangs.
- */
-const SCREENSHOT_TOTAL_BUDGET_MS = 60_000
+export interface ScreenshotResult {
+  bytes: Buffer
+  width: number
+  height: number
+}
 
-export async function screenshot(url: string, domain: string): Promise<string> {
+/**
+ * Captures a JPEG screenshot of `url` and returns the bytes in memory along with the
+ * viewport dimensions. The scanner streams the bytes straight to ImageKit; nothing is
+ * written to disk. The `budgetMs` ceiling caps how long any single capture can hold a
+ * browser page open regardless of which inner step hangs (goto, banner sweep, capture).
+ */
+export async function screenshot(url: string, domain: string, budgetMs: number): Promise<ScreenshotResult> {
   return await Promise.race([
     captureScreenshot(url, domain),
-    new Promise<string>((_, reject) => {
+    new Promise<ScreenshotResult>((_, reject) => {
       setTimeout(
-        () => reject(new Error(`screenshot budget of ${SCREENSHOT_TOTAL_BUDGET_MS}ms exceeded`)),
-        SCREENSHOT_TOTAL_BUDGET_MS,
+        () => reject(new Error(`screenshot budget of ${budgetMs}ms exceeded`)),
+        budgetMs,
       ).unref()
     }),
   ])
 }
 
-async function captureScreenshot(url: string, domain: string): Promise<string> {
+const VIEWPORT_WIDTH = 1280
+const VIEWPORT_HEIGHT = 800
+
+async function captureScreenshot(url: string, domain: string): Promise<ScreenshotResult> {
   const context = await getContext()
 
   let parsedDomain = domain
@@ -175,22 +187,16 @@ async function captureScreenshot(url: string, domain: string): Promise<string> {
     await hideViewportOverlays(page).catch(() => { /* noop */ })
     await page.waitForTimeout(200)
 
-    const screenshotPath = join(config.screenshotDir, `${safeName(domain)}.jpg`)
-    await page.screenshot({
-      path: screenshotPath,
+    const bytes = await page.screenshot({
       type: 'jpeg',
       quality: 80,
       fullPage: false,
       timeout: 30_000,
     })
-    return screenshotPath
+    return { bytes, width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT }
   } finally {
     await page.close().catch(() => { /* noop */ })
   }
-}
-
-function safeName(domain: string): string {
-  return domain.replace(/[^a-z0-9.-]/gi, '_')
 }
 
 /**

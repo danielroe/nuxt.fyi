@@ -11,3 +11,4 @@ vendor/
 *.log
 dashboard/.nuxt
 dashboard/.output
+services/scanner/.output

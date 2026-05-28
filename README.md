@@ -30,16 +30,35 @@ cp .env.example .env
 corepack enable
 pnpm install
 pnpm install-extension
-pnpm exec playwright install chromium
+pnpm --filter @nuxt-fyi/scanner exec playwright install chromium
 
-# daemon
+# scanner (terminal 1: screenshot service on :3001)
+pnpm dev:scanner
+
+# daemon (terminal 2)
 pnpm dev
 
-# dashboard (separate terminal)
+# dashboard (terminal 3)
 pnpm dev:dashboard
 ```
 
 Set `VERBOSE=1` to log every post the daemon sees.
+
+## Architecture
+
+Three processes split across two Fly apps:
+
+- `nuxt-fyi` (this `fly.toml`): daemon (Jetstream consumer + detection) and dashboard
+  (Nuxt 4) in one container, sharing the SQLite volume at `/data`.
+- `nuxt-fyi-scanner` (`fly.scanner.toml`): Nitro v3 service that owns Playwright + the
+  screenshot half of the ImageKit upload. Scales to zero when idle; the daemon's HTTP
+  client warms it on the next confirmed Nuxt hit. No public ingress; daemon reaches it
+  on `nuxt-fyi-scanner.flycast:3000` via Fly private networking.
+- ImageKit: external CDN for screenshots + og:images.
+
+The daemon talks to the scanner via an authenticated HTTP call (`SCANNER_TOKEN` shared
+secret). Scanner outages degrade quality (no screenshot) but don't break the pipeline:
+the og:image is still uploaded and the hit is still recorded + posted.
 
 ## Image hosting
 

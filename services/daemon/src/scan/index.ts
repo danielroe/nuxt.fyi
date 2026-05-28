@@ -2,11 +2,11 @@ import { log } from '../log.ts'
 import { scanHtml } from './html.ts'
 import { probeNuxtEndpoints } from './probe.ts'
 import { scanReferencedJs } from './js.ts'
-import { screenshot } from './headless.ts'
+import { remoteCapture } from './remote.ts'
 import { canonicalDomain } from '../domains.ts'
 import { parse as parseHost } from 'tldts'
 import type { DetectionResult, DetectionSignal } from './detect.ts'
-import { uploadOgImage, uploadScreenshot } from '../imagekit.ts'
+import { uploadOgImage } from '../imagekit.ts'
 
 export interface ScanOutcome {
   domain: string
@@ -15,6 +15,9 @@ export interface ScanOutcome {
   title: string | null
   /** og:description / twitter:description / <meta name="description">, trimmed. */
   description: string | null
+  /** Local file path for the screenshot. After the scanner extraction, screenshots no
+   *  longer touch the daemon's filesystem; this field is preserved for backward-compat
+   *  but is always null for scans performed after the split. */
   screenshotPath: string | null
   /** og:image URL declared by the site, validated as reachable and image-typed. */
   ogImage: string | null
@@ -173,29 +176,27 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
   }
 
   let ogImage: string | null = null
-  let screenshotPath: string | null = null
+  const screenshotPath: string | null = null
   let screenshotKey: string | null = null
   let ogImageKey: string | null = null
   let screenshotError: string | null = null
   if (detection.isNuxt) {
-    // Capture both sources when available: the dashboard offers a toggle between them
-    // so we want both uploaded to ImageKit independently. Either failing is non-fatal;
-    // the row just renders without that source.
+    // Both sources are captured and uploaded independently so the dashboard can offer a
+    // toggle between them. The screenshot is delegated to the scanner service (which
+    // owns Playwright and the screenshot half of the ImageKit upload); the og:image is
+    // fetched and uploaded directly from here. Either failing is non-fatal.
     if (html.ogImage) {
       ogImage = await validateOgImage(html.ogImage)
       if (ogImage) log.debug(`[scan] ${domain} og:image ok: ${ogImage}`)
       else log.debug(`[scan] ${domain} og:image rejected (${html.ogImage})`)
     }
-    try {
-      screenshotPath = await screenshot(html.finalUrl, domain)
-    }
-    catch (err) {
-      screenshotError = `screenshot: ${(err as Error).message}`
-      log.warn(`[scan] ${domain} screenshot failed: ${(err as Error).message}`)
-    }
-    if (screenshotPath) {
-      const uploaded = await uploadScreenshot(domain, screenshotPath)
-      if (uploaded) screenshotKey = uploaded.filePath
+    const capture = await remoteCapture(html.finalUrl, domain)
+    if (capture) {
+      screenshotKey = capture.imageKey
+      if (capture.error && !capture.imageKey) {
+        screenshotError = `screenshot: ${capture.error}`
+        log.warn(`[scan] ${domain} scanner reported: ${capture.error}`)
+      }
     }
     if (ogImage) {
       const uploaded = await uploadOgImage(domain, ogImage)
@@ -242,7 +243,9 @@ export async function recaptureImage(domain: string): Promise<RecaptureOutcome> 
   const html = await scanHtml(url)
 
   let ogImage: string | null = null
-  let screenshotPath: string | null = null
+  // After the scanner extraction, screenshots no longer touch the daemon's filesystem.
+  // The field stays in the outcome for backwards compatibility with the existing schema.
+  const screenshotPath: string | null = null
   let screenshotKey: string | null = null
   let ogImageKey: string | null = null
   let error: string | null = null
@@ -252,16 +255,13 @@ export async function recaptureImage(domain: string): Promise<RecaptureOutcome> 
     if (ogImage) log.debug(`[recapture] ${domain} og:image ok: ${ogImage}`)
     else log.debug(`[recapture] ${domain} og:image rejected (${html.ogImage})`)
   }
-  try {
-    screenshotPath = await screenshot(html.finalUrl, domain)
-  }
-  catch (err) {
-    error = `screenshot: ${(err as Error).message}`
-    log.warn(`[recapture] ${domain} screenshot failed: ${(err as Error).message}`)
-  }
-  if (screenshotPath) {
-    const uploaded = await uploadScreenshot(domain, screenshotPath)
-    if (uploaded) screenshotKey = uploaded.filePath
+  const capture = await remoteCapture(html.finalUrl, domain)
+  if (capture) {
+    screenshotKey = capture.imageKey
+    if (capture.error && !capture.imageKey) {
+      error = `screenshot: ${capture.error}`
+      log.warn(`[recapture] ${domain} scanner reported: ${capture.error}`)
+    }
   }
   if (ogImage) {
     const uploaded = await uploadOgImage(domain, ogImage)

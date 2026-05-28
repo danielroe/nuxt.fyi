@@ -1,15 +1,13 @@
-import { createReadStream } from 'node:fs'
-import { stat } from 'node:fs/promises'
 import ImageKit, { toFile } from '@imagekit/nodejs'
 import { config } from './config.ts'
 import { log } from './log.ts'
 
 /**
- * Thin wrapper around @imagekit/nodejs for the daemon's narrow upload needs. Uploads are
- * always treated as best-effort: if the SDK isn't configured, or any step throws, we log
- * and return null so the caller can carry on with the local file as a fallback. The
- * dashboard renders whichever source ends up persisted (ImageKit key, local file, or
- * upstream og:image URL).
+ * Thin wrapper around @imagekit/nodejs for the daemon's og:image uploads. The screenshot
+ * half of this lives on the scanner service (which has the JPEG bytes in memory already);
+ * the daemon only owns og:image uploads because it already has the URL from `scanHtml`.
+ * All failures are best-effort: returning null lets the caller render whichever source
+ * is still available.
  */
 
 let client: ImageKit | null = null
@@ -38,8 +36,8 @@ export function imagekitEnabled(): boolean {
 }
 
 /**
- * Strips a domain to filesystem-safe characters. Mirrors the daemon's existing screenshot
- * naming convention so backfill can locate on-disk files from a domain alone.
+ * Strips a domain to filesystem-safe characters. Mirrors the scanner's naming convention
+ * so the og:image and screenshot paths can be derived from a domain alone.
  */
 function safeName(domain: string): string {
   return domain.replace(/[^a-z0-9.-]/gi, '_')
@@ -99,25 +97,6 @@ async function doUpload(
     return null
   }
 }
-
-/**
- * Uploads a local screenshot JPEG to ImageKit at `<rootFolder>/screenshots/<domain>.jpg`.
- * Returns the bucket-relative path on success, null on any failure including the SDK
- * being unconfigured.
- */
-export async function uploadScreenshot(domain: string, localPath: string): Promise<UploadOk | null> {
-  if (!imagekitEnabled()) return null
-  try {
-    await stat(localPath)
-  }
-  catch {
-    log.warn(`[imagekit] screenshot file missing: ${localPath}`)
-    return null
-  }
-  const stream = createReadStream(localPath)
-  return doUpload(stream, `${safeName(domain)}.jpg`, `${config.imagekit.rootFolder}/screenshots`)
-}
-
 
 /**
  * Fetches an upstream og:image URL, then uploads the bytes to ImageKit. The fetch is

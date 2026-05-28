@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { scanDomain } from '../scan/index.ts'
-import { closeBrowser } from '../scan/headless.ts'
 
 const target = process.argv[2]
 if (!target) {
@@ -21,4 +20,4 @@ console.log(JSON.stringify({
   screenshotPath: outcome.screenshotPath,
   error: outcome.error,
 }, null, 2))
-await closeBrowser()
+

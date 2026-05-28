@@ -3,6 +3,7 @@ services/*/node_modules
 dashboard/node_modules
 dashboard/.nuxt
 dashboard/.output
+services/*/.output
 .git
 .github
 .env

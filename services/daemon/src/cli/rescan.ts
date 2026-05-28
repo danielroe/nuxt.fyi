@@ -13,7 +13,6 @@
  */
 import { parseArgs } from 'node:util'
 import { log } from '../log.ts'
-import { closeBrowser } from '../scan/headless.ts'
 import { recaptureImage, scanDomain } from '../scan/index.ts'
 import { dispatchNotifications, persistOutcome } from '../pipeline.ts'
 import { getScan, recordRescanImage } from '../store.ts'
@@ -149,8 +148,6 @@ for (const domain of domains) {
     results.push({ domain, ok: false, mode: 'full', error: message })
   }
 }
-
-await closeBrowser()
 
 process.stdout.write(`${JSON.stringify(results, null, 2)}\n`)
 

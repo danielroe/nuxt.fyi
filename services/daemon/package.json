@@ -14,7 +14,6 @@
     "stats": "node --env-file-if-exists=../../.env src/cli/stats.ts",
     "test": "node --test 'src/**/*.test.ts'",
     "test:types": "tsc --noEmit",
-    "install-extension": "node scripts/fetch-extension.mjs",
     "ingest-tranco": "node scripts/ingest-tranco.mjs",
     "ingest-nuxt-versions": "node scripts/ingest-nuxt-versions.mjs",
     "backfill-imagekit": "node --env-file-if-exists=../../.env scripts/backfill-imagekit.mjs"
@@ -23,7 +22,6 @@
     "@atproto/api": "^0.20.6",
     "@imagekit/nodejs": "^7.6.2",
     "consola": "^3.4.0",
-    "playwright": "^1.49.0",
     "tldts": "^6.1.0"
   },
   "devDependencies": {

@@ -20,7 +20,6 @@ function runIngestScript(scriptName: string, label: string): Promise<void> {
 import { Queue } from './queue.ts'
 import { getScan, recordDomainSeen } from './store.ts'
 import { scanDomain } from './scan/index.ts'
-import { closeBrowser } from './scan/headless.ts'
 import { dispatchNotifications, persistOutcome } from './pipeline.ts'
 
 interface ScanJob {
@@ -124,7 +123,6 @@ async function shutdown(signal: string): Promise<void> {
   } else {
     log.warn(`[shutdown] drain timed out after ${drainTimeoutMs}ms; ${queue.active} scans were still in flight`)
   }
-  await closeBrowser()
   process.exit(0)
 }
 

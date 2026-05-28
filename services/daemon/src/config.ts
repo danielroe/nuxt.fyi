@@ -21,6 +21,13 @@ export const config = {
   dataDir: resolve(process.env.NUXT_DATA_DIR || '../../data'),
   screenshotDir: resolve(process.env.NUXT_SCREENSHOT_DIR || '../../screenshots'),
   verbose: bool(process.env.VERBOSE),
+  scanner: {
+    /** Base URL of the screenshot service, e.g. http://nuxt-fyi-scanner.internal:3000.
+     *  Empty disables remote capture; the dashboard will still render og:images. */
+    url: process.env.SCANNER_URL || '',
+    /** Shared bearer token. Must match SCANNER_TOKEN on the scanner machine. */
+    token: process.env.SCANNER_TOKEN || '',
+  },
   imagekit: {
     /** Public URL endpoint, e.g. https://ik.imagekit.io/<id>. Empty disables uploads. */
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || '',
