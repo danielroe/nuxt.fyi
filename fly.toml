@@ -51,8 +51,8 @@ primary_region = "lhr"
   min_machines_running = 1
 
 [[vm]]
-  size = "shared-cpu-2x"
-  memory = "4gb"
+  size = "shared-cpu-1x"
+  memory = "1gb"
 
 [[restart]]
   policy = "always"
