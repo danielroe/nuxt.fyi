@@ -121,7 +121,7 @@ function barWidth(value: number, max: number): string {
 .bars .bar > div { background: var(--accent); height: 12px; border-radius: 2px; min-width: 2px; }
 .bars .count { text-align: right; color: var(--muted); white-space: nowrap; }
 
-.versions-layout { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+.versions-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 900px) {
   .versions-layout { grid-template-columns: minmax(0, 3fr) minmax(220px, 1fr); align-items: start; }
 }

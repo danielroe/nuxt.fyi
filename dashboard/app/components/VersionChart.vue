@@ -196,10 +196,12 @@ const layout = computed(() => {
 .version-chart {
   margin: 1rem 0;
   width: 100%;
+  min-width: 0;
 }
 .version-chart svg {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: auto;
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 11px;
