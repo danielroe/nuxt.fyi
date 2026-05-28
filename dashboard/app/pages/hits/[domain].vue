@@ -89,14 +89,15 @@ const backTo = computed<RouteLocationRaw>(() => {
 
       <h2>Activity</h2>
       <p class="muted small">
-        first seen on Bluesky <NuxtTime v-if="data.firstSeenAt" :datetime="data.firstSeenAt" relative /><span v-else>&mdash;</span> &middot;
-        last seen <NuxtTime v-if="data.lastSeenAt" :datetime="data.lastSeenAt" relative /><span v-else>&mdash;</span> &middot;
-        mentioned {{ fmtNumber(data.seenCount) }} time<span v-if="data.seenCount !== 1">s</span>
+        first seen on Bluesky <NuxtTime v-if="data.firstSeenAt" :datetime="data.firstSeenAt" relative /><span v-else>&mdash;</span>
+        <template v-if="data.seenCount !== 1">
+          &middot; last seen <NuxtTime v-if="data.lastSeenAt" :datetime="data.lastSeenAt" relative /><span v-else>&mdash;</span>
+        </template>
+        &middot; mentioned {{ fmtNumber(data.seenCount) }} time<span v-if="data.seenCount !== 1">s</span>
       </p>
       <ul v-if="data.notifications.length" class="notifications">
         <li v-for="n in sortedNotifications" :key="n.channel">
-          posted to <strong :class="`channel-${n.channel}`">{{ channelLabel(n.channel) }}</strong>
-          <NuxtTime :datetime="n.postedAt" relative />
+          posted to <strong :class="`channel-${n.channel}`">{{ channelLabel(n.channel) }}</strong>{{ ' ' }}<NuxtTime :datetime="n.postedAt" relative />
         </li>
       </ul>
     </div>

@@ -28,7 +28,7 @@ router.afterEach((to, from) => {
         <NuxtLink :to="hitsList">nuxt sites</NuxtLink>
         <NuxtLink :to="recent">recent domains</NuxtLink>
       </nav>
-      <a class="external" href="https://github.com/danielroe/nuxt.fyi" target="_blank" rel="noopener">
+      <a class="external header-external" href="https://github.com/danielroe/nuxt.fyi" target="_blank" rel="noopener">
         github<span class="sr-only"> (opens in a new tab)</span>
       </a>
     </header>
@@ -41,6 +41,9 @@ router.afterEach((to, from) => {
         made with <span aria-label="love" role="img">❤️</span> by
         <a href="https://roe.dev" target="_blank" rel="noopener">daniel roe<span class="sr-only"> (opens in a new tab)</span></a>
       </span>
+      <a class="external footer-external" href="https://github.com/danielroe/nuxt.fyi" target="_blank" rel="noopener">
+        github<span class="sr-only"> (opens in a new tab)</span>
+      </a>
     </footer>
   </div>
 </template>
@@ -73,9 +76,14 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
 .site-header a { color: var(--fg); text-decoration: none; padding: 0.25rem 0; white-space: nowrap; }
 .site-header a.router-link-active { color: var(--accent); border-bottom: 2px solid var(--accent); }
 .site-header .external { color: var(--muted); }
+footer .footer-external { color: var(--muted); text-decoration: none; }
+footer .footer-external:hover { color: var(--accent); }
+.footer-external { display: none; }
 @media (max-width: 640px) {
   .site-header { gap: 0.75rem 1rem; }
   .site-header nav { gap: 0.75rem 1rem; }
+  .header-external { display: none; }
+  .footer-external { display: inline; }
 }
 main { flex-grow: 1; }
 main:focus { outline: none; }

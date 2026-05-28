@@ -111,9 +111,12 @@ function barWidth(value: number, max: number): string {
 .big { font-size: 1.8rem; color: var(--accent); }
 .label { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
 .small { font-size: 0.85rem; }
-.bars { width: 100%; border-collapse: collapse; }
+.bars { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .bars td { padding: 0.25rem 0.5rem; }
-.bars .ver { white-space: nowrap; }
+.bars .ver { word-break: break-word; }
+@media (min-width: 640px) {
+  .bars .ver { white-space: nowrap; word-break: normal; }
+}
 .bars .bar { width: 100%; }
 .bars .bar > div { background: var(--accent); height: 12px; border-radius: 2px; min-width: 2px; }
 .bars .count { text-align: right; color: var(--muted); white-space: nowrap; }

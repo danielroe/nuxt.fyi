@@ -110,7 +110,8 @@ function ariaSortValue(key: Sort): 'ascending' | 'descending' | 'none' {
 
     <div v-if="pending && !data" role="status" aria-live="polite" class="muted">loading…</div>
 
-    <table v-if="data" class="rows">
+    <div v-if="data" class="rows-scroll">
+    <table class="rows">
       <caption class="sr-only">Recent domains observed on Bluesky, filtered by {{ activeFilter.label }}</caption>
       <thead>
         <tr>
@@ -153,6 +154,7 @@ function ariaSortValue(key: Sort): 'ascending' | 'descending' | 'none' {
         </tr>
       </tbody>
     </table>
+    </div>
 
     <p v-if="data && data.rows.length === 0" role="status" class="muted">no rows match this filter</p>
   </div>
@@ -174,7 +176,8 @@ function ariaSortValue(key: Sort): 'ascending' | 'descending' | 'none' {
 }
 .filter-link:hover { border-color: var(--accent); }
 .filter-link.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
-.rows { width: 100%; border-collapse: collapse; }
+.rows-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.rows { width: 100%; border-collapse: collapse; min-width: 560px; }
 .rows th { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: normal; font-size: 0.85rem; }
 .rows th .sort-link { color: inherit; text-decoration: none; display: inline-block; cursor: pointer; }
 .rows th .sort-link:hover { color: var(--accent); }
