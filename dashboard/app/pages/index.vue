@@ -7,11 +7,10 @@ useHead({ title: 'Overview — nuxt.fyi' })
 
 const { data } = await useFetch('/api/stats')
 
-const offRegistryVersions = computed(() =>
-  (data.value?.versions ?? []).filter(v => v.bucket === 'off-registry'),
-)
-const unknownVersions = computed(() =>
-  (data.value?.versions ?? []).filter(v => v.bucket === 'unknown'),
+const unverifiedCount = computed(() =>
+  (data.value?.versions ?? [])
+    .filter(v => v.bucket === 'off-registry' || v.bucket === 'unknown')
+    .reduce((sum, v) => sum + v.count, 0),
 )
 </script>
 
@@ -45,38 +44,12 @@ const unknownVersions = computed(() =>
     </p>
 
     <h2 id="versions-heading">versions detected</h2>
-    <div class="versions-layout">
-      <div class="versions-chart">
-        <VersionChart :versions="data.versions" aria-labelledby="versions-heading" />
-      </div>
-      <aside class="versions-aside" aria-label="Off-registry and unknown versions">
-        <h3 id="off-registry-heading">off-registry &amp; unknown</h3>
-        <p class="muted small">
-          versions we couldn't verify against
-          <a href="https://www.npmjs.com/package/nuxt" target="_blank" rel="noopener">
-            npmjs.com<span class="sr-only"> (opens in a new tab)</span></a>,
-          or sites where we couldn't detect a version at all.
-        </p>
-        <table class="aside-table" aria-labelledby="off-registry-heading">
-          <thead>
-            <tr>
-              <th scope="col">version</th>
-              <th scope="col" class="count">sites</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in offRegistryVersions" :key="row.version">
-              <td>{{ row.version }}</td>
-              <td class="count">{{ fmtNumber(row.count) }}</td>
-            </tr>
-            <tr v-for="row in unknownVersions" :key="`unk-${row.version}`" class="unknown">
-              <td><span class="sr-only">unverified: </span><em>{{ row.version }}</em></td>
-              <td class="count">{{ fmtNumber(row.count) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </aside>
-    </div>
+    <VersionChart :versions="data.versions" aria-labelledby="versions-heading" />
+    <p v-if="unverifiedCount > 0" class="muted small versions-footnote">
+      plus {{ fmtNumber(unverifiedCount) }} other sites with versions we couldn't verify
+      against <a href="https://www.npmjs.com/package/nuxt" target="_blank" rel="noopener">npmjs.com<span class="sr-only"> (opens in a new tab)</span></a>,
+      or sites where we couldn't detect a version at all.
+    </p>
 
     <h2 id="signals-heading">signals that fired on nuxt hits</h2>
     <table class="bars" aria-labelledby="signals-heading">
@@ -121,15 +94,5 @@ function barWidth(value: number, max: number): string {
 .bars .bar > div { background: var(--accent); height: 12px; border-radius: 2px; min-width: 2px; }
 .bars .count { text-align: right; color: var(--muted); white-space: nowrap; }
 
-.versions-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 900px) {
-  .versions-layout { grid-template-columns: minmax(0, 3fr) minmax(220px, 1fr); align-items: start; }
-}
-.versions-chart { min-width: 0; }
-.versions-aside h3 { font-size: 0.95rem; color: var(--muted); margin: 0 0 0.5rem; font-weight: normal; }
-.versions-aside code { background: var(--accent-dim); padding: 0 0.2rem; border-radius: 2px; color: var(--accent); }
-.aside-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.aside-table td { padding: 0.2rem 0.5rem; border-bottom: 1px solid var(--border); }
-.aside-table td.count { text-align: right; color: var(--muted); }
-.aside-table tr.unknown td em { color: var(--muted); font-style: normal; }
+.versions-footnote { margin: 0.5rem 0 0; }
 </style>

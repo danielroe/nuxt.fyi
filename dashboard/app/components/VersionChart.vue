@@ -174,21 +174,23 @@ const layout = computed(() => {
         >{{ b.label }}</text>
       </g>
     </svg>
-    <table class="sr-only">
-      <caption>Nuxt sites grouped by detected major.minor version</caption>
-      <thead>
-        <tr>
-          <th scope="col">version</th>
-          <th scope="col">sites</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="b in buckets" :key="b.label">
-          <td>{{ b.isUnknown ? 'unknown' : `v${b.label}` }}</td>
-          <td>{{ b.count.toLocaleString() }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="sr-only">
+      <table>
+        <caption>Nuxt sites grouped by detected major.minor version</caption>
+        <thead>
+          <tr>
+            <th scope="col">version</th>
+            <th scope="col">sites</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="b in buckets" :key="b.label">
+            <td>{{ b.isUnknown ? 'unknown' : `v${b.label}` }}</td>
+            <td>{{ b.count.toLocaleString() }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 

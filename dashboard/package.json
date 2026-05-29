@@ -10,6 +10,7 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "dev:ui-only": "NUXT_UI_ONLY=1 NODE_OPTIONS=\"${NODE_OPTIONS:-} --use-env-proxy\" nuxt dev",
+    "dev:fixtures": "NUXT_FIXTURES=1 nuxt dev",
     "postinstall": "nuxt prepare",
     "preview": "node .output/server/index.mjs",
     "test:types": "nuxt typecheck"

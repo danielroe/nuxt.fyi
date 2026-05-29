@@ -1,10 +1,12 @@
 import { getDb } from '../utils/db'
+import { fixtureStats } from '../utils/fixtures'
 import { getPublishedNuxtVersions } from '../utils/nuxt-versions'
 
 interface CountRow { c: number }
 interface SignalListRow { signals: string }
 
 export default defineEventHandler(() => {
+  if (process.env.NUXT_FIXTURES) return fixtureStats
   const db = getDb()
   const c = (sql: string): number => (db.prepare(sql).get() as unknown as CountRow).c
   const published = getPublishedNuxtVersions()

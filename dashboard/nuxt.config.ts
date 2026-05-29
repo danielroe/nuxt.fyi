@@ -2,6 +2,10 @@
 // (override the target with `NUXT_UI_ONLY_TARGET`) so UI work doesn't need a populated
 // local SQLite database. The flag is read once at config-eval time, so it only takes
 // effect for the dev session it started.
+//
+// `NUXT_FIXTURES=1 nuxt dev` serves static dummy data from `server/utils/fixtures.ts`
+// instead of hitting SQLite or the deployed dashboard. Use it for offline UI work and
+// for reproducing rendering bugs (eg. the home-page SVG overflow) without prod data.
 const uiOnly = !!process.env.NUXT_UI_ONLY
 const uiOnlyTarget = process.env.NUXT_UI_ONLY_TARGET || 'https://nuxt.fyi'
 

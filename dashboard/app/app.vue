@@ -82,7 +82,12 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
 .layout { max-width: 1100px; margin: 0 auto; padding: 1rem; min-height: 100vh; display: flex; flex-direction: column; }
 .skip-link { position: absolute; top: -100px; left: 0.5rem; background: var(--bg); color: var(--fg); border: 2px solid var(--accent); padding: 0.5rem 0.75rem; z-index: 100; text-decoration: none; border-radius: 3px; }
 .skip-link:focus { top: 0.5rem; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* `clip-path: inset(50%)` replaces the deprecated `clip: rect(0 0 0 0)` because WebKit
+   still lets a `clip`-hidden element with `white-space: nowrap` contribute its full
+   unwrapped width to ancestor intrinsic-size calculations, which on the home page makes
+   the version-chart's sr-only data table push the layout wider than the viewport. The
+   `inset(50%)` form collapses the box for layout-sizing purposes too. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); border: 0; }
 .site-header { display: flex; align-items: baseline; gap: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; flex-wrap: wrap; }
 .site-title { color: var(--accent); font-weight: 700; font-size: 1.25rem; text-decoration: none; }
 .site-header nav { display: flex; gap: 1rem; flex-grow: 1; flex-wrap: wrap; }
