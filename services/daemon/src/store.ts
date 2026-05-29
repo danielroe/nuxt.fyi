@@ -133,7 +133,6 @@ const updateImageStmt = db.prepare(`
     scanned_at = ?,
     final_url = ?,
     title = COALESCE(?, title),
-    screenshot_path = ?,
     og_image = ?,
     screenshot_key = ?,
     og_image_key = ?,
@@ -214,7 +213,6 @@ export function recordRescanImage(input: {
   domain: string
   finalUrl: string
   title: string | null
-  screenshotPath: string | null
   ogImage: string | null
   screenshotKey: string | null
   ogImageKey: string | null
@@ -228,7 +226,6 @@ export function recordRescanImage(input: {
     Date.now(),
     input.finalUrl,
     input.title,
-    input.screenshotPath,
     input.ogImage,
     input.screenshotKey,
     input.ogImageKey,

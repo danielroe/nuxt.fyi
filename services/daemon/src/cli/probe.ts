@@ -17,7 +17,8 @@ console.log(JSON.stringify({
   signals: outcome.detection.signals,
   finalUrl: outcome.finalUrl,
   title: outcome.title,
-  screenshotPath: outcome.screenshotPath,
+  screenshotKey: outcome.screenshotKey,
+  ogImageKey: outcome.ogImageKey,
   error: outcome.error,
 }, null, 2))
 

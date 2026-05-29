@@ -20,7 +20,6 @@ primary_region = "lhr"
   SCAN_CONCURRENCY = "2"
   RESCAN_AFTER_MS = "2592000000"
   NUXT_DATA_DIR = "/data"
-  NUXT_SCREENSHOT_DIR = "/data/screenshots"
   SHUTDOWN_DRAIN_MS = "25000"
   # The dashboard listens on 3000; Fly's [http_service] forwards :443 to it.
   PORT = "3000"

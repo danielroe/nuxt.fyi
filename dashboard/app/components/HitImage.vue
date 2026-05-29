@@ -7,9 +7,10 @@
  * exposes `data-has-screenshot` / `data-has-og` so CSS can fall back when the preferred
  * source is absent.
  *
- * Source priority within a family: ImageKit (via `<NuxtImg provider="imagekit">`) when
- * the key is present, else the legacy URL (local `/api/screenshots/...` or upstream
- * og:image URL). At most one element is emitted per family.
+ * Screenshots always come from ImageKit (via `<NuxtImg provider="imagekit">`). The
+ * og:image side prefers ImageKit too, but keeps a plain `<img src>` fallback to the
+ * upstream URL for the rare row where the daemon recorded an og:image origin but the
+ * ImageKit upload didn't land.
  *
  * NSFW handling: when `nsfwLabel === 'nsfw'` the wrapper carries `data-nsfw="nsfw"`
  * which CSS uses to blur the image and overlay a "show NSFW" button. Click toggles
@@ -20,7 +21,6 @@
 interface ImageSources {
   screenshotKey: string | null
   ogImageKey: string | null
-  screenshotUrl: string | null
   ogImageUrl: string | null
   nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null
 }
@@ -37,7 +37,7 @@ const props = defineProps<{
 const W = computed(() => props.width ?? 1280)
 const H = computed(() => props.height ?? 800)
 
-const hasScreenshot = computed(() => !!(props.image.screenshotKey || props.image.screenshotUrl))
+const hasScreenshot = computed(() => !!props.image.screenshotKey)
 const hasOg = computed(() => !!(props.image.ogImageKey || props.image.ogImageUrl))
 const hasAny = computed(() => hasScreenshot.value || hasOg.value)
 const isNsfw = computed(() => props.image.nsfwLabel === 'nsfw')
@@ -67,18 +67,6 @@ function reveal(): void { revealed.value = true }
       decoding="async"
       referrerpolicy="no-referrer"
     />
-    <img
-      v-else-if="image.screenshotUrl"
-      :src="image.screenshotUrl"
-      :alt="alt"
-      class="hit-image-source hit-image-screenshot"
-      :width="W"
-      :height="H"
-      :loading="loading ?? 'lazy'"
-      :fetchpriority="fetchpriority ?? 'auto'"
-      decoding="async"
-      referrerpolicy="no-referrer"
-    >
 
     <NuxtImg
       v-if="image.ogImageKey"

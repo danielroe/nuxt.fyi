@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 /**
- * Rescans every Nuxt-confirmed row that's missing one or both ImageKit-hosted images, or
- * whose images are still on disk only (legacy `screenshot_path` without a `screenshot_key`).
- * Reuses `scanDomain` end-to-end so the same scanner / ImageKit / NSFW pipeline runs as
- * for live scans. Ignores `RESCAN_AFTER_MS`.
+ * Rescans every Nuxt-confirmed row that's missing an ImageKit-hosted screenshot, OR has
+ * an og:image origin URL recorded but no ImageKit copy of it. Reuses `scanDomain`
+ * end-to-end so the same scanner / ImageKit / NSFW pipeline runs as for live scans.
+ * Ignores `RESCAN_AFTER_MS`.
+ *
+ * Rows where the site simply doesn't declare an og:image (so `og_image IS NULL`) are
+ * left alone if they already have a screenshot key — there's nothing rescanning would
+ * fix.
  *
  * Notifications are suppressed (Bluesky and Discord aren't supposed to re-fire on
  * historical rows). Concurrency is bounded by `--concurrency` and ultimately by the
@@ -47,7 +51,6 @@ const where = `
   is_nuxt = 1
   AND (
     screenshot_key IS NULL
-    OR og_image_key IS NULL
     OR (og_image IS NOT NULL AND og_image_key IS NULL)
   )
 `

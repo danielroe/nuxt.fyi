@@ -17,7 +17,7 @@ export function persistOutcome(outcome: ScanOutcome): void {
     signals: JSON.stringify(outcome.detection.signals),
     final_url: outcome.finalUrl,
     title: outcome.title,
-    screenshot_path: outcome.screenshotPath,
+    screenshot_path: null,
     og_image: outcome.ogImage,
     screenshot_key: outcome.screenshotKey,
     og_image_key: outcome.ogImageKey,

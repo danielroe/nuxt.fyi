@@ -16,7 +16,6 @@
     "test:types": "tsc --noEmit",
     "ingest-tranco": "node scripts/ingest-tranco.mjs",
     "ingest-nuxt-versions": "node scripts/ingest-nuxt-versions.mjs",
-    "backfill-imagekit": "node --env-file-if-exists=../../.env scripts/backfill-imagekit.mjs",
     "backfill-images": "node --env-file-if-exists=../../.env src/cli/backfill-images.ts",
     "backfill-nsfw": "node --env-file-if-exists=../../.env scripts/backfill-nsfw.mjs"
   },

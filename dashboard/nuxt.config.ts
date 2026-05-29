@@ -11,7 +11,6 @@ export default defineNuxtConfig({
   modules: ['@nuxt/image'],
   runtimeConfig: {
     dataDir: '../data',
-    screenshotDir: '../screenshots',
   },
   image: {
     imagekit: {
@@ -50,7 +49,6 @@ export default defineNuxtConfig({
       : {
           '/api/stats': { swr: 1 },
           '/api/hits/**': { swr: 300 },
-          '/api/screenshots/**': { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800' } },
         }),
   },
   app: {

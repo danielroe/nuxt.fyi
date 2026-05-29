@@ -15,10 +15,6 @@ export interface ScanOutcome {
   title: string | null
   /** og:description / twitter:description / <meta name="description">, trimmed. */
   description: string | null
-  /** Local file path for the screenshot. After the scanner extraction, screenshots no
-   *  longer touch the daemon's filesystem; this field is preserved for backward-compat
-   *  but is always null for scans performed after the split. */
-  screenshotPath: string | null
   /** og:image URL declared by the site, validated as reachable and image-typed. */
   ogImage: string | null
   /** ImageKit path for the captured screenshot, when upload succeeded. */
@@ -109,7 +105,6 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
       finalUrl: null,
       title: null,
       description: null,
-      screenshotPath: null,
       ogImage: null,
       screenshotKey: null,
       ogImageKey: null,
@@ -135,7 +130,6 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
       finalUrl: html.finalUrl,
       title: html.title,
       description: html.description,
-      screenshotPath: null,
       ogImage: null,
       screenshotKey: null,
       ogImageKey: null,
@@ -191,7 +185,6 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
   }
 
   let ogImage: string | null = null
-  const screenshotPath: string | null = null
   let screenshotKey: string | null = null
   let ogImageKey: string | null = null
   let nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null = null
@@ -237,7 +230,6 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
     title: html.title,
     description: html.description,
     redirectedTo: null,
-    screenshotPath,
     ogImage,
     screenshotKey,
     ogImageKey,
@@ -251,7 +243,6 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
 
 export interface RecaptureOutcome {
   ogImage: string | null
-  screenshotPath: string | null
   screenshotKey: string | null
   ogImageKey: string | null
   nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null
@@ -277,9 +268,6 @@ export async function recaptureImage(domain: string): Promise<RecaptureOutcome> 
   const html = await scanHtml(url)
 
   let ogImage: string | null = null
-  // After the scanner extraction, screenshots no longer touch the daemon's filesystem.
-  // The field stays in the outcome for backwards compatibility with the existing schema.
-  const screenshotPath: string | null = null
   let screenshotKey: string | null = null
   let ogImageKey: string | null = null
   let nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null = null
@@ -314,7 +302,6 @@ export async function recaptureImage(domain: string): Promise<RecaptureOutcome> 
 
   return {
     ogImage,
-    screenshotPath,
     screenshotKey,
     ogImageKey,
     nsfwLabel,

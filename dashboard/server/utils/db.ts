@@ -41,7 +41,6 @@ export interface ScanRow {
   signals: string
   final_url: string | null
   title: string | null
-  screenshot_path: string | null
   og_image: string | null
   screenshot_key: string | null
   og_image_key: string | null

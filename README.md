@@ -78,22 +78,19 @@ the og:image is still uploaded and the hit is still recorded + posted.
 
 ## Image hosting
 
-Screenshots and og:images are uploaded to [ImageKit](https://imagekit.io) at scan time so
-the dashboard can render them through `@nuxt/image` with on-the-fly resizing. ImageKit is
-optional: if `IMAGEKIT_URL_ENDPOINT` / `IMAGEKIT_PRIVATE_KEY` are unset, uploads are
-skipped and the dashboard falls back to streaming the daemon's local screenshot directory
-via `/api/screenshots/<domain>`.
+Screenshots and og:images are uploaded to [ImageKit](https://imagekit.io) at scan time
+so the dashboard can render them through `@nuxt/image` with on-the-fly resizing. The
+dashboard renders ImageKit URLs only; for the rare row where the daemon recorded an
+og:image origin but the upload didn't land, a plain `<img>` falls back to the upstream
+URL.
 
 ## Backfill scripts
 
-Three one-off scripts on the daemon side, all idempotent and safe to re-run:
+Two idempotent scripts on the daemon side, safe to re-run:
 
 ```bash
-# Upload pre-ImageKit local screenshots + upstream og:images to ImageKit.
-pnpm backfill-imagekit --concurrency=3
-
-# Rescan Nuxt-confirmed rows missing screenshot_key, og_image_key, or both.
-# Uses the live scanner; ignores RESCAN_AFTER_MS.
+# Rescan Nuxt-confirmed rows missing an ImageKit screenshot, or with an og:image URL
+# recorded but no ImageKit copy. Uses the live scanner; ignores RESCAN_AFTER_MS.
 pnpm backfill-images --concurrency=2
 
 # NSFW-classify every row that has an image but no nsfw_label. Calls the scanner's
@@ -101,8 +98,7 @@ pnpm backfill-images --concurrency=2
 pnpm backfill-nsfw --concurrency=2
 ```
 
-All three support `--limit=N` and `--dry-run`. The image-related ones expect ImageKit
-and (where relevant) scanner secrets in the environment.
+Both support `--limit=N` and `--dry-run`.
 
 ## Admin CLI
 

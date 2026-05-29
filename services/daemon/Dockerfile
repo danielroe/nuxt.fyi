@@ -33,7 +33,6 @@ FROM node:24-bookworm-slim AS runtime
 # extension, no Playwright. The screenshot pipeline lives on the nuxt-fyi-scanner app.
 ENV NODE_ENV=production
 ENV NUXT_DATA_DIR=/data
-ENV NUXT_SCREENSHOT_DIR=/data/screenshots
 
 WORKDIR /app
 RUN corepack enable
@@ -48,7 +47,7 @@ RUN apt-get update \
 # Nitro's standalone output bundles its own node_modules; no install needed at runtime.
 COPY --from=dashboard-build /repo/dashboard/.output ./dashboard/.output
 
-RUN mkdir -p /data/screenshots
+RUN mkdir -p /data
 
 # Single entrypoint runs daemon + dashboard inside one machine.
 CMD ["node", "scripts/run-machine.mjs"]

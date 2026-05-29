@@ -64,7 +64,6 @@ interface Result {
   confidence?: number
   finalUrl?: string | null
   ogImage?: string | null
-  screenshotPath?: string | null
   screenshotKey?: string | null
   ogImageKey?: string | null
   notified?: boolean
@@ -92,7 +91,6 @@ for (const domain of domains) {
         domain,
         finalUrl: out.finalUrl,
         title: out.title,
-        screenshotPath: out.screenshotPath,
         ogImage: out.ogImage,
         screenshotKey: out.screenshotKey,
         ogImageKey: out.ogImageKey,
@@ -102,14 +100,15 @@ for (const domain of domains) {
         nsfwClassifiedAt: out.nsfwClassifiedAt,
         error: out.error,
       })
-      log.success(`[rescan] ${domain} image refreshed (og:${out.ogImage ? 'yes' : 'no'} shot:${out.screenshotPath ? 'yes' : 'no'} ik-shot:${out.screenshotKey ? 'yes' : 'no'} ik-og:${out.ogImageKey ? 'yes' : 'no'} nsfw:${out.nsfwLabel ?? 'unknown'})`)
+      log.success(`[rescan] ${domain} image refreshed (og:${out.ogImage ? 'yes' : 'no'} ik-shot:${out.screenshotKey ? 'yes' : 'no'} ik-og:${out.ogImageKey ? 'yes' : 'no'} nsfw:${out.nsfwLabel ?? 'unknown'})`)
       results.push({
         domain,
         ok: !out.error,
         mode: 'screenshot-only',
         finalUrl: out.finalUrl,
         ogImage: out.ogImage,
-        screenshotPath: out.screenshotPath,
+        screenshotKey: out.screenshotKey,
+        ogImageKey: out.ogImageKey,
         error: out.error,
       })
     }
@@ -139,7 +138,6 @@ for (const domain of domains) {
       confidence: outcome.detection.confidence,
       finalUrl: outcome.finalUrl,
       ogImage: outcome.ogImage,
-      screenshotPath: outcome.screenshotPath,
       screenshotKey: outcome.screenshotKey,
       ogImageKey: outcome.ogImageKey,
       notified,
