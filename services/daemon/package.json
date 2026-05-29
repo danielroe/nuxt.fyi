@@ -12,6 +12,7 @@
     "probe": "node --env-file-if-exists=../../.env src/cli/probe.ts",
     "rescan": "node --env-file-if-exists=../../.env src/cli/rescan.ts",
     "stats": "node --env-file-if-exists=../../.env src/cli/stats.ts",
+    "status": "node --env-file-if-exists=../../.env src/cli/status.ts",
     "test": "node --test 'src/**/*.test.ts'",
     "test:types": "tsc --noEmit",
     "ingest-tranco": "node scripts/ingest-tranco.mjs",

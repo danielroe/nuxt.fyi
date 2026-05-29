@@ -15,6 +15,7 @@
     "probe": "pnpm --filter @nuxt-fyi/daemon probe",
     "rescan": "pnpm --filter @nuxt-fyi/daemon rescan",
     "stats": "pnpm --filter @nuxt-fyi/daemon stats",
+    "status": "pnpm --filter @nuxt-fyi/daemon status",
     "test": "pnpm -r --workspace-concurrency=1 test",
     "test:types": "pnpm -r test:types",
     "install-extension": "pnpm --filter @nuxt-fyi/scanner install-extension",

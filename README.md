@@ -103,7 +103,7 @@ Both support `--limit=N` and `--dry-run`.
 ## Admin CLI
 
 On the running Fly machine (`fly ssh console -C bash`), you can re-scan one or more
-domains against the live database:
+domains against the live database, or check what we currently know about one:
 
 ```bash
 cd /app
@@ -114,6 +114,10 @@ node src/cli/rescan.ts --screenshot-only example.com
 
 # suppress Discord + Bluesky posts even when the domain is newly detected as Nuxt
 node src/cli/rescan.ts --no-notify example.com
+
+# read-only: dump the stored scan, NSFW classification, activity, and notifications.
+# Pass --json for machine-readable output.
+node src/cli/status.ts example.com
 ```
 
 ## Credits
