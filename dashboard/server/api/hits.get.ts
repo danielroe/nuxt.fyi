@@ -30,7 +30,7 @@ export default defineCachedEventHandler((event) => {
     ? `${sortCol} IS NULL, ${sortCol} ${rankOrder}, s.scanned_at DESC`
     : `${sortCol} ${order}`
 
-  let where = `s.is_nuxt = 1`
+  let where = `s.is_nuxt = 1 AND (s.screenshot_key IS NOT NULL OR s.og_image_key IS NOT NULL)`
   const params: SQLInputValue[] = []
   if (version) {
     if (version === 'unknown') {

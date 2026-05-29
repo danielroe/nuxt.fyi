@@ -28,29 +28,13 @@ export default defineNuxtConfig({
       },
     },
   },
-  routeRules: {
-    '/': { swr: 1 },
-    '/hits': { swr: 1 },
-    '/hits/scanned_at/**': { swr: 1 },
-    '/hits/rank/**': { swr: 1 },
-    '/hits/seen_count/**': { swr: 1 },
-    '/hits/confidence/**': { swr: 1 },
-    // Domain detail pages change rarely (per scan), so a longer SWR is safe.
-    '/hits/**': { swr: 300 },
-    '/recent': { swr: 1 },
-    '/recent/**': { swr: 1 },
-    ...(uiOnly
-      ? {
-          // Wildcard alone wins because we omit the more-specific local-cache rules
-          // below; otherwise Nitro's radix matcher prefers them and the local handler
-          // still runs.
+  ...(uiOnly
+    ? {
+        routeRules: {
           '/api/**': { proxy: `${uiOnlyTarget}/api/**`, swr: false },
-        }
-      : {
-          '/api/stats': { swr: 1 },
-          '/api/hits/**': { swr: 300 },
-        }),
-  },
+        },
+      }
+    : {}),
   app: {
     head: {
       title: 'nuxt.fyi',

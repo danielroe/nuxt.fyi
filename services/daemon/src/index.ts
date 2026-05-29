@@ -47,7 +47,7 @@ const captureQueue = new Queue<CaptureJob>(
 
 let postsSeen = 0
 let urlsSeen = 0
-let domainsQueued = 0
+let domainsEnqueued = 0
 let nuxtFound = 0
 
 /**
@@ -81,7 +81,7 @@ async function handleDetection({ domain }: DetectionJob): Promise<void> {
     if (outcome.redirectedTo && outcome.redirectedTo !== domain) {
       log.info(`[detect] ${domain} redirects to ${outcome.redirectedTo}; queuing destination`)
       if (!shouldSkipDomain(outcome.redirectedTo) && detectionQueue.enqueue({ domain: outcome.redirectedTo })) {
-        domainsQueued++
+        domainsEnqueued++
       }
       return
     }
@@ -209,7 +209,7 @@ startJetstream({
       const existing = getScan(domain)
       if (existing && Date.now() - existing.scanned_at < config.rescanAfterMs) continue
       if (detectionQueue.enqueue({ domain })) {
-        domainsQueued++
+        domainsEnqueued++
         log.debug(`[queue] +${domain} (detect=${detectionQueue.size + detectionQueue.active})`)
       }
     }
@@ -217,7 +217,7 @@ startJetstream({
 })
 
 const statsInterval = setInterval(() => {
-  log.info(`[stats] posts=${postsSeen} urls=${urlsSeen} queued=${domainsQueued} detect=${detectionQueue.active}/${detectionQueue.size + detectionQueue.active} capture=${captureQueue.active}/${captureQueue.size + captureQueue.active} nuxt=${nuxtFound}`)
+  log.info(`[stats] posts=${postsSeen} urls=${urlsSeen} enqueued=${domainsEnqueued} detect=${detectionQueue.active}+${detectionQueue.size} capture=${captureQueue.active}+${captureQueue.size} nuxt=${nuxtFound}`)
 }, 30_000)
 
 let shuttingDown = false
