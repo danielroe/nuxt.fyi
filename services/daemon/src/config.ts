@@ -13,7 +13,17 @@ function bool(value: string | undefined): boolean {
 export const config = {
   jetstreamUrl: process.env.JETSTREAM_URL || 'wss://jetstream2.us-east.bsky.network/subscribe',
   discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
-  scanConcurrency: num(process.env.SCAN_CONCURRENCY, 2),
+  /**
+   * Concurrency for detection jobs (HTML fetch + endpoint probes + JS scan). All I/O-
+   * bound, so the daemon can comfortably run a few dozen in parallel.
+   */
+  detectionConcurrency: num(process.env.DETECTION_CONCURRENCY, 8),
+  /**
+   * Concurrency for capture jobs (call scanner + upload og:image to ImageKit). Bound
+   * by the scanner's `hard_limit` in `fly.scanner.toml`; pushing past that just queues
+   * at Fly's edge.
+   */
+  captureConcurrency: num(process.env.CAPTURE_CONCURRENCY, 4),
   rescanAfterMs: num(process.env.RESCAN_AFTER_MS, 30 * 24 * 60 * 60 * 1000),
   // Defaults point at the repo-root `data/` directory, two levels up from this package
   // (`services/daemon/`). The dashboard's default resolves to the same path from its own

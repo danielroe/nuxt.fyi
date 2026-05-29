@@ -17,7 +17,9 @@ primary_region = "lhr"
 
 [env]
   JETSTREAM_URL = "wss://jetstream2.us-east.bsky.network/subscribe"
-  SCAN_CONCURRENCY = "2"
+  # Daemon's two queues. See services/daemon/src/index.ts for shape.
+  DETECTION_CONCURRENCY = "8"
+  CAPTURE_CONCURRENCY = "4"
   RESCAN_AFTER_MS = "2592000000"
   NUXT_DATA_DIR = "/data"
   SHUTDOWN_DRAIN_MS = "25000"

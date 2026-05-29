@@ -153,6 +153,46 @@ const updateNsfwStmt = db.prepare(`
   WHERE domain = ?
 `)
 
+/**
+ * Detection-only upsert: writes everything the detection stage knows (signals, version,
+ * candidate og:image URL) and leaves the capture-stage columns (`screenshot_key`,
+ * `og_image_key`, `nsfw_*`) untouched on update so concurrent capture writes don't race.
+ * On insert, those columns are NULL by default.
+ */
+const upsertDetectionStmt = db.prepare(`
+  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+  ON CONFLICT(domain) DO UPDATE SET
+    scanned_at = excluded.scanned_at,
+    is_nuxt = excluded.is_nuxt,
+    nuxt_version = excluded.nuxt_version,
+    confidence = excluded.confidence,
+    signals = excluded.signals,
+    final_url = excluded.final_url,
+    title = excluded.title,
+    og_image = excluded.og_image,
+    redirected_to = excluded.redirected_to,
+    error = excluded.error
+`)
+
+/**
+ * Capture-only update: writes image keys + NSFW + validated og:image. Touches only the
+ * fields produced by `captureForDomain` so it can safely run after `recordDetection`
+ * without clobbering detection results.
+ */
+const updateCaptureStmt = db.prepare(`
+  UPDATE scans SET
+    og_image = ?,
+    screenshot_key = ?,
+    og_image_key = ?,
+    nsfw_label = ?,
+    nsfw_score = ?,
+    nsfw_categories = ?,
+    nsfw_classified_at = ?,
+    error = COALESCE(?, error)
+  WHERE domain = ?
+`)
+
 const hasNotifiedStmt = db.prepare(`SELECT 1 FROM notifications WHERE domain = ? AND channel = ?`)
 const recordNotificationStmt = db.prepare(`
   INSERT OR REPLACE INTO notifications (domain, channel, posted_at) VALUES (?, ?, ?)
@@ -243,6 +283,68 @@ export function recordRescanImage(input: {
  * NSFW columns unconditionally (unlike `recordRescanImage` which uses COALESCE) since
  * the caller has just computed fresh values.
  */
+/**
+ * Detection-stage write: signals, confidence, candidate og:image URL. Used by the
+ * detection queue worker as the first write for a scan; capture writes follow up via
+ * `recordCapture`. Safe to call even when capture is queued/in-flight: the UPSERT only
+ * touches detection columns.
+ */
+export function recordDetection(input: {
+  domain: string
+  isNuxt: boolean
+  nuxtVersion: string | null
+  confidence: number
+  signals: string
+  finalUrl: string | null
+  title: string | null
+  ogImage: string | null
+  redirectedTo: string | null
+  error: string | null
+}): void {
+  upsertDetectionStmt.run(
+    input.domain,
+    Date.now(),
+    input.isNuxt ? 1 : 0,
+    input.nuxtVersion,
+    input.confidence,
+    input.signals,
+    input.finalUrl,
+    input.title,
+    input.ogImage,
+    input.redirectedTo,
+    input.error,
+  )
+}
+
+/**
+ * Capture-stage update: image keys, validated og:image URL, NSFW classification. Runs
+ * after `recordDetection` for confirmed-Nuxt rows; the error column is COALESCE'd so a
+ * capture-side error doesn't clobber a detection-side one.
+ */
+export function recordCapture(input: {
+  domain: string
+  ogImage: string | null
+  screenshotKey: string | null
+  ogImageKey: string | null
+  nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null
+  nsfwScore: number | null
+  nsfwCategories: string | null
+  nsfwClassifiedAt: number | null
+  error: string | null
+}): void {
+  updateCaptureStmt.run(
+    input.ogImage,
+    input.screenshotKey,
+    input.ogImageKey,
+    input.nsfwLabel,
+    input.nsfwScore,
+    input.nsfwCategories,
+    input.nsfwClassifiedAt,
+    input.error,
+    input.domain,
+  )
+}
+
 export function recordNsfwClassification(input: {
   domain: string
   nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null

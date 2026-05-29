@@ -58,6 +58,15 @@ export class Queue<T> {
     return this.inFlight.size
   }
 
+  /**
+   * Snapshot of currently-pending items, in FIFO order. Returns copies of the references
+   * so callers can serialise without worrying about concurrent mutation. Used by the
+   * shutdown hook to persist queue state to disk so deploys don't drop pending work.
+   */
+  snapshotPending(): T[] {
+    return [...this.pending]
+  }
+
   private drain(): void {
     if (this.closed) return
     while (this.inFlight.size < this.opts.concurrency && this.pending.length > 0) {

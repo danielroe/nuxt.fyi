@@ -87,11 +87,42 @@ function combine(...resultSignals: DetectionSignal[][]): { signals: DetectionSig
 }
 
 /**
- * Scans `domain` for Nuxt via a four-stage pipeline ordered cheapest first: HTML fetch +
- * regex, Nuxt-specific endpoint probes, entry-chunk JS grep, and finally a Playwright
- * screenshot reserved for confirmed hits.
+ * Detection-only outcome: HTML + endpoint probes + JS scan. Cheap (just HTTP calls) so
+ * the daemon can run this at high concurrency. The image fields are always null at this
+ * stage; `captureForDomain` fills them in afterwards if the row is Nuxt.
  */
-export async function scanDomain(domain: string): Promise<ScanOutcome> {
+export interface DetectionOutcome {
+  domain: string
+  detection: DetectionResult
+  finalUrl: string | null
+  title: string | null
+  description: string | null
+  /** og:image origin URL declared by the site. Validated as reachable and image-typed.
+   *  The image bytes don't get fetched/uploaded here; `captureForDomain` does that. */
+  ogImage: string | null
+  redirectedTo: string | null
+  error: string | null
+}
+
+function emptyDetectionOutcome(domain: string, error: string | null): DetectionOutcome {
+  return {
+    domain,
+    detection: { isNuxt: false, confidence: 0, nuxtVersion: null, signals: [] },
+    finalUrl: null,
+    title: null,
+    description: null,
+    ogImage: null,
+    redirectedTo: null,
+    error,
+  }
+}
+
+/**
+ * Detection half of a scan: HTML fetch + regex, Nuxt-specific endpoint probes, entry-
+ * chunk JS grep. Returns enough state for the caller to persist the detection row and
+ * decide whether to enqueue capture. No image work happens here.
+ */
+export async function detectDomain(domain: string): Promise<DetectionOutcome> {
   const url = `https://${domain}/`
 
   let html: Awaited<ReturnType<typeof scanHtml>>
@@ -99,22 +130,7 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
     html = await scanHtml(url)
   }
   catch (err) {
-    return {
-      domain,
-      detection: { isNuxt: false, confidence: 0, nuxtVersion: null, signals: [] },
-      finalUrl: null,
-      title: null,
-      description: null,
-      ogImage: null,
-      screenshotKey: null,
-      ogImageKey: null,
-      nsfwLabel: null,
-      nsfwScore: null,
-      nsfwCategories: null,
-      nsfwClassifiedAt: null,
-      redirectedTo: null,
-      error: (err as Error).message,
-    }
+    return emptyDetectionOutcome(domain, (err as Error).message)
   }
 
   // If the fetch followed a redirect to a different registrable domain (e.g. a URL
@@ -123,7 +139,7 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
   const destination = registrableHostFromUrl(html.finalUrl)
   const sourceRegistrable = parseHost(domain).domain || domain
   if (destination && destination !== sourceRegistrable) {
-    log.debug(`[scan] ${domain} redirected to ${destination}; deferring detection to that domain`)
+    log.debug(`[detect] ${domain} redirected to ${destination}; deferring detection to that domain`)
     return {
       domain,
       detection: { isNuxt: false, confidence: 0, nuxtVersion: null, signals: [] },
@@ -131,18 +147,13 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
       title: html.title,
       description: html.description,
       ogImage: null,
-      screenshotKey: null,
-      ogImageKey: null,
-      nsfwLabel: null,
-      nsfwScore: null,
-      nsfwCategories: null,
-      nsfwClassifiedAt: null,
       redirectedTo: canonicalDomain(new URL(html.finalUrl).hostname),
       error: null,
     }
   }
+  // (Fall through to the detection pipeline below.)
 
-  log.debug(`[scan] ${domain} html confidence=${html.detection.confidence} signals=${html.detection.signals.map(s => s.name).join(',')}`)
+  log.debug(`[detect] ${domain} html confidence=${html.detection.confidence} signals=${html.detection.signals.map(s => s.name).join(',')}`)
 
   let nuxtVersion = html.detection.nuxtVersion
   let signals = [...html.detection.signals]
@@ -150,7 +161,7 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
   if (html.detection.confidence < CONFIDENCE_THRESHOLD || !nuxtVersion) {
     const probe = await probeNuxtEndpoints(html.finalUrl)
     if (probe.signals.length > 0) {
-      log.debug(`[scan] ${domain} probe hits: ${probe.signals.map(s => s.name).join(', ')}`)
+      log.debug(`[detect] ${domain} probe hits: ${probe.signals.map(s => s.name).join(', ')}`)
     }
     signals = combine(signals, probe.signals).signals
   }
@@ -160,7 +171,7 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
   if (confidence < CONFIDENCE_THRESHOLD) {
     const js = await scanReferencedJs(html.html, html.finalUrl)
     if (js.signals.length > 0) {
-      log.debug(`[scan] ${domain} js hits (${js.fetched} chunks): ${js.signals.map(s => s.name).join(', ')}`)
+      log.debug(`[detect] ${domain} js hits (${js.fetched} chunks): ${js.signals.map(s => s.name).join(', ')}`)
     }
     signals = combine(signals, js.signals).signals
     if (!nuxtVersion && js.nuxtVersion) nuxtVersion = js.nuxtVersion
@@ -173,7 +184,7 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
     const js = await scanReferencedJs(html.html, html.finalUrl, { limit: 1 })
     if (js.nuxtVersion) {
       nuxtVersion = js.nuxtVersion
-      log.debug(`[scan] ${domain} version from entry chunk: ${nuxtVersion}`)
+      log.debug(`[detect] ${domain} version from entry chunk: ${nuxtVersion}`)
     }
   }
 
@@ -184,45 +195,6 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
     signals,
   }
 
-  let ogImage: string | null = null
-  let screenshotKey: string | null = null
-  let ogImageKey: string | null = null
-  let nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null = null
-  let nsfwScore: number | null = null
-  let nsfwCategories: string | null = null
-  let nsfwClassifiedAt: number | null = null
-  let screenshotError: string | null = null
-  if (detection.isNuxt) {
-    // Both sources are captured and uploaded independently so the dashboard can offer a
-    // toggle between them. The screenshot is delegated to the scanner service (which
-    // owns Playwright + nsfwjs classification + the screenshot half of the ImageKit
-    // upload); the og:image is fetched and uploaded directly from here. Either failing
-    // is non-fatal.
-    if (html.ogImage) {
-      ogImage = await validateOgImage(html.ogImage)
-      if (ogImage) log.debug(`[scan] ${domain} og:image ok: ${ogImage}`)
-      else log.debug(`[scan] ${domain} og:image rejected (${html.ogImage})`)
-    }
-    const capture = await remoteCapture(html.finalUrl, domain)
-    if (capture) {
-      screenshotKey = capture.imageKey
-      if (capture.nsfw) {
-        nsfwLabel = capture.nsfw.label
-        nsfwScore = capture.nsfw.score
-        nsfwCategories = JSON.stringify(capture.nsfw.categories)
-        nsfwClassifiedAt = capture.capturedAt
-      }
-      if (capture.error && !capture.imageKey) {
-        screenshotError = `screenshot: ${capture.error}`
-        log.warn(`[scan] ${domain} scanner reported: ${capture.error}`)
-      }
-    }
-    if (ogImage) {
-      const uploaded = await uploadOgImage(domain, ogImage)
-      if (uploaded) ogImageKey = uploaded.filePath
-    }
-  }
-
   return {
     domain,
     detection,
@@ -230,6 +202,70 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
     title: html.title,
     description: html.description,
     redirectedTo: null,
+    ogImage: html.ogImage,
+    error: null,
+  }
+}
+
+/**
+ * Image-capture half of a scan. Validates the og:image, calls the scanner for the
+ * screenshot + NSFW classification, and uploads the og:image bytes to ImageKit. The
+ * caller passes in the detection outcome so this function doesn't need to redo any of
+ * the cheap detection work.
+ *
+ * Returns the image-related fields the caller should persist. All four image fields can
+ * be null independently; failure of one doesn't block the others.
+ */
+export interface CaptureOutcome {
+  ogImage: string | null
+  screenshotKey: string | null
+  ogImageKey: string | null
+  nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null
+  nsfwScore: number | null
+  nsfwCategories: string | null
+  nsfwClassifiedAt: number | null
+  error: string | null
+}
+
+export async function captureForDomain(
+  domain: string,
+  finalUrl: string,
+  candidateOgImage: string | null,
+): Promise<CaptureOutcome> {
+  let ogImage: string | null = null
+  let screenshotKey: string | null = null
+  let ogImageKey: string | null = null
+  let nsfwLabel: 'safe' | 'suggestive' | 'nsfw' | null = null
+  let nsfwScore: number | null = null
+  let nsfwCategories: string | null = null
+  let nsfwClassifiedAt: number | null = null
+  let error: string | null = null
+
+  if (candidateOgImage) {
+    ogImage = await validateOgImage(candidateOgImage)
+    if (ogImage) log.debug(`[capture] ${domain} og:image ok: ${ogImage}`)
+    else log.debug(`[capture] ${domain} og:image rejected (${candidateOgImage})`)
+  }
+  const capture = await remoteCapture(finalUrl, domain)
+  if (capture) {
+    screenshotKey = capture.imageKey
+    if (capture.nsfw) {
+      nsfwLabel = capture.nsfw.label
+      nsfwScore = capture.nsfw.score
+      nsfwCategories = JSON.stringify(capture.nsfw.categories)
+      nsfwClassifiedAt = capture.capturedAt
+    }
+    if (capture.error && !capture.imageKey) {
+      error = `screenshot: ${capture.error}`
+      log.warn(`[capture] ${domain} scanner reported: ${capture.error}`)
+    }
+  }
+  if (ogImage) {
+    const uploaded = await uploadOgImage(domain, ogImage)
+    if (uploaded) ogImageKey = uploaded.filePath
+  }
+
+  return {
     ogImage,
     screenshotKey,
     ogImageKey,
@@ -237,7 +273,43 @@ export async function scanDomain(domain: string): Promise<ScanOutcome> {
     nsfwScore,
     nsfwCategories,
     nsfwClassifiedAt,
-    error: screenshotError,
+    error,
+  }
+}
+
+/**
+ * Convenience wrapper that runs detection then capture in series, returning the unified
+ * `ScanOutcome` shape. Used by the rescan CLI and the image-less backfill script, where
+ * the caller wants the combined behaviour in a single process. The daemon's main scan
+ * pipeline calls `detectDomain` and `captureForDomain` directly so they can run on
+ * separate queues.
+ */
+export async function scanDomain(domain: string): Promise<ScanOutcome> {
+  const detected = await detectDomain(domain)
+  // No detection work, no capture: short-circuit so the outcome matches what the daemon
+  // would have written before the queue split.
+  if (!detected.detection.isNuxt || !detected.finalUrl) {
+    return {
+      ...detected,
+      screenshotKey: null,
+      ogImageKey: null,
+      nsfwLabel: null,
+      nsfwScore: null,
+      nsfwCategories: null,
+      nsfwClassifiedAt: null,
+    }
+  }
+  const captured = await captureForDomain(detected.domain, detected.finalUrl, detected.ogImage)
+  return {
+    ...detected,
+    ogImage: captured.ogImage,
+    screenshotKey: captured.screenshotKey,
+    ogImageKey: captured.ogImageKey,
+    nsfwLabel: captured.nsfwLabel,
+    nsfwScore: captured.nsfwScore,
+    nsfwCategories: captured.nsfwCategories,
+    nsfwClassifiedAt: captured.nsfwClassifiedAt,
+    error: detected.error ?? captured.error,
   }
 }
 
