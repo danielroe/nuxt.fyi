@@ -26,7 +26,6 @@ jobs:
       - run: pnpm -r run test:types
       - run: pnpm test
       - run: pnpm --filter nuxt-fyi-dashboard build
-      - run: pnpm --filter @nuxt-fyi/scanner build
 
   deploy-scanner:
     needs: test
