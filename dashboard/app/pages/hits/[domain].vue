@@ -15,6 +15,9 @@ useHead({
     const v = data.value?.version ? ` (v${data.value.version})` : ''
     return `${domain.value}${v} — nuxt.fyi`
   },
+  meta: [
+    { name: 'robots', content: 'nofollow' }
+  ]
 })
 
 const CHANNEL_ORDER: Record<string, number> = { discord: 0, bluesky: 1 }
