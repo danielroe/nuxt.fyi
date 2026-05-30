@@ -15,6 +15,9 @@ useHead({
     const v = data.value?.version ? ` (v${data.value.version})` : ''
     return `${domain.value}${v} — nuxt.fyi`
   },
+  meta: [
+    { name: 'robots', content: 'nofollow' }
+  ]
 })
 
 const CHANNEL_ORDER: Record<string, number> = { discord: 0, bluesky: 1 }
@@ -52,7 +55,7 @@ const backTo = computed<RouteLocationRaw>(() => {
       </h1>
       <p v-if="data.title" class="muted">{{ data.title }}</p>
       <p>
-        <a :href="data.finalUrl || `https://${data.domain}`" target="_blank" rel="noopener">
+        <a :href="data.finalUrl || `https://${data.domain}`" target="_blank" rel="nofollow noopener">
           {{ data.finalUrl || `https://${data.domain}` }}<span class="sr-only"> (opens in a new tab)</span>
         </a>
       </p>
