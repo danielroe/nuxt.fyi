@@ -52,7 +52,7 @@ const backTo = computed<RouteLocationRaw>(() => {
       </h1>
       <p v-if="data.title" class="muted">{{ data.title }}</p>
       <p>
-        <a :href="data.finalUrl || `https://${data.domain}`" target="_blank" rel="noopener">
+        <a :href="data.finalUrl || `https://${data.domain}`" target="_blank" rel="nofollow noopener">
           {{ data.finalUrl || `https://${data.domain}` }}<span class="sr-only"> (opens in a new tab)</span>
         </a>
       </p>
