@@ -36,7 +36,6 @@ router.afterEach((to, from) => {
     <header class="site-header">
       <NuxtLink :to="home" class="site-title">nuxt.fyi</NuxtLink>
       <nav aria-label="Primary">
-        <NuxtLink :to="home">overview</NuxtLink>
         <NuxtLink :to="hitsList">nuxt sites</NuxtLink>
         <NuxtLink :to="recent">recent domains</NuxtLink>
       </nav>
@@ -90,7 +89,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); border: 0; }
 .site-header { display: flex; align-items: baseline; gap: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; flex-wrap: wrap; }
 .site-title { color: var(--accent); font-weight: 700; font-size: 1.25rem; text-decoration: none; }
-.site-header nav { display: flex; gap: 1rem; flex-grow: 1; flex-wrap: wrap; }
+.site-header nav { display: flex; gap: 1.75rem; flex-grow: 1; flex-wrap: wrap; }
 .site-header a { color: var(--fg); text-decoration: none; padding: 0.25rem 0; white-space: nowrap; }
 .site-header a.router-link-active { color: var(--accent); border-bottom: 2px solid var(--accent); }
 .site-header .external { color: var(--muted); }
@@ -99,7 +98,7 @@ footer .footer-external:hover { color: var(--accent); }
 .footer-external { display: none; }
 @media (max-width: 640px) {
   .site-header { gap: 0.75rem 1rem; }
-  .site-header nav { gap: 0.75rem 1rem; }
+  .site-header nav { gap: 0.75rem 1.5rem; }
   .header-external { display: none; }
   .footer-external { display: inline; }
 }
