@@ -46,6 +46,18 @@ export const config = {
      *  underneath so the dashboard can render both for the same domain. */
     rootFolder: process.env.IMAGEKIT_ROOT_FOLDER || '/nuxt-fyi',
   },
+  submit: {
+    /** Port for the daemon's submit HTTP endpoint. Bound to 127.0.0.1 only; the
+     *  dashboard process (running in the same container in prod, same host in dev)
+     *  POSTs to it. Set `DAEMON_SUBMIT_ENABLED=0` to disable entirely. Port 0 means
+     *  "let the OS pick" (handy for tests). */
+    enabled: process.env.DAEMON_SUBMIT_ENABLED !== '0',
+    port: num(process.env.DAEMON_SUBMIT_PORT, 3010),
+    /** Shared bearer token between the dashboard's `/api/submit` route and this
+     *  endpoint. Empty disables: the daemon refuses every request, and the dashboard
+     *  surfaces a configuration error. */
+    token: process.env.DAEMON_SUBMIT_TOKEN || '',
+  },
   bluesky: {
     service: process.env.BLUESKY_SERVICE || 'https://bsky.social',
     identifier: process.env.BLUESKY_IDENTIFIER || '',

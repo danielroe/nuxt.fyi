@@ -33,6 +33,9 @@ primary_region = "lhr"
   SCANNER_URL = "http://nuxt-fyi-scanner.internal:3000"
   # SCANNER_TOKEN is set via `fly secrets set -a nuxt-fyi` and must match the secret of
   # the same name on the nuxt-fyi-scanner app.
+  # Daemon's submit endpoint. Bound to 127.0.0.1, reachable only from the co-located
+  # dashboard process. DAEMON_SUBMIT_TOKEN is a fly secret shared between both processes.
+  DAEMON_SUBMIT_PORT = "3010"
 
 # Single persistent volume holds the sqlite db plus screenshots.
 [[mounts]]

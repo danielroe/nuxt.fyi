@@ -44,6 +44,23 @@ pnpm dev:dashboard
 
 Set `VERBOSE=1` to log every post the daemon sees.
 
+## Manual submissions
+
+The dashboard's home page has a small form for queueing a domain by hand. Under the
+hood:
+
+- The dashboard's `POST /api/submit` rate-limits per IP (default 5 / minute, tunable via
+  `SUBMIT_RATE_LIMIT` and `SUBMIT_RATE_WINDOW_MS`).
+- It then posts the URL to the daemon's loopback-only submit server (`DAEMON_SUBMIT_PORT`,
+  default 3010) using the shared `DAEMON_SUBMIT_TOKEN` bearer secret.
+- The daemon canonicalises the domain, checks the global skip list, and either enqueues a
+  detection job (same path the Jetstream consumer uses) or short-circuits with the
+  existing result if the domain has been scanned within `RESCAN_AFTER_MS`.
+
+Set `DAEMON_SUBMIT_TOKEN` as a Fly secret on `nuxt-fyi` to enable it in production; leave
+it empty to disable submissions entirely (the daemon refuses every request, the dashboard
+returns 503).
+
 ## NSFW classification
 
 Screenshots are classified with [nsfwjs](https://github.com/infinitered/nsfwjs) on the

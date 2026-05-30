@@ -7,6 +7,7 @@ import { extractUrls } from './extract.ts'
 import { canonicalDomain, normaliseUrl, shouldSkipDomain } from './domains.ts'
 import { Queue } from './queue.ts'
 import { getScan, recordCapture, recordDetection, recordDomainSeen } from './store.ts'
+import { startSubmitServer } from './submit-server.ts'
 import { captureForDomain, detectDomain, type DetectionOutcome } from './scan/index.ts'
 import { dispatchNotifications } from './pipeline.ts'
 import { type CaptureJob, loadQueueState, saveQueueState } from './queue-state.ts'
@@ -186,6 +187,19 @@ const controller = new AbortController()
 
 restoreQueues()
 
+const submitServer = startSubmitServer({
+  enqueueDetection: (domain) => {
+    const accepted = detectionQueue.enqueue({ domain })
+    if (accepted) {
+      domainsEnqueued++
+      log.info(`[submit] +${domain} (detect=${detectionQueue.size + detectionQueue.active})`)
+    }
+    return accepted
+  },
+  getScan,
+  recordDomainSeen,
+})
+
 startJetstream({
   signal: controller.signal,
   onEvent: (event) => {
@@ -227,6 +241,7 @@ async function shutdown(signal: string): Promise<void> {
   log.info(`[shutdown] caught ${signal}; closing jetstream and draining queues`)
   clearInterval(statsInterval)
   controller.abort()
+  if (submitServer) submitServer.close()
 
   // Snapshot pending work before drain so a fast Fly deploy can pick it back up next
   // boot. In-flight jobs aren't saved here; they get the drain timeout to finish, and

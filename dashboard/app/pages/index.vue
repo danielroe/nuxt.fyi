@@ -43,6 +43,8 @@ const unverifiedCount = computed(() =>
       {{ fmtNumber(data.stats.errors) }} scans errored
     </p>
 
+    <SubmitForm />
+
     <h2 id="versions-heading">versions detected</h2>
     <VersionChart :versions="data.versions" aria-labelledby="versions-heading" />
     <p v-if="unverifiedCount > 0" class="muted small versions-footnote">
