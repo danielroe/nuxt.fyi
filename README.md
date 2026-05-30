@@ -15,6 +15,7 @@ The [public dashboard](https://nuxt.fyi/) shows everything that's been detected,
 - Detection signals across HTML and a Playwright runtime probe (`<div id="__nuxt">`, `__NUXT_DATA__`, `window.__NUXT__`, `meta[name=generator]`, `/_nuxt/` assets)
 - Screenshots taken in a persistent Chromium context, with layered cookie-banner suppression (GTM consent cookie, CSS overlay, and a pinned [`I-Still-Dont-Care-About-Cookies`](https://github.com/OhMyGuus/I-Still-Dont-Care-About-Cookies) extension)
 - Discord + Bluesky notifications with rate-limit-aware posting
+- @-mention triggered replies: tag the bot on Bluesky with a URL and it replies with the scan result + screenshot, scanning on the spot if it's a domain we haven't seen yet
 - Nuxt 4 dashboard reading the same SQLite database read-only
 - Runs on a single [Fly.io](https://fly.io/) machine; daemon and dashboard share one volume
 - Node 24+ only: native TS execution, `node:sqlite`, global `fetch` and `WebSocket`

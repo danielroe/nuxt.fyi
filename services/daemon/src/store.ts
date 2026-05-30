@@ -75,6 +75,21 @@ db.exec(`
     posted_at  INTEGER NOT NULL,
     PRIMARY KEY (domain, channel)
   );
+
+  CREATE TABLE IF NOT EXISTS reply_requests (
+    post_uri      TEXT NOT NULL,
+    post_cid      TEXT NOT NULL,
+    root_uri      TEXT NOT NULL,
+    root_cid      TEXT NOT NULL,
+    author_did    TEXT NOT NULL,
+    domain        TEXT NOT NULL,
+    requested_at  INTEGER NOT NULL,
+    replied_at    INTEGER,
+    PRIMARY KEY (post_uri, domain)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_reply_requests_pending
+    ON reply_requests (domain) WHERE replied_at IS NULL;
 `)
 
 // Idempotent forward migrations for columns added after the first release. SQLite has no
@@ -397,4 +412,80 @@ const lastNotifiedStmt = db.prepare(
 export function lastNotifiedAt(channel: string): number {
   const row = lastNotifiedStmt.get(channel) as { at: number | null } | undefined
   return row?.at ?? 0
+}
+
+export interface ReplyRequestRow {
+  post_uri: string
+  post_cid: string
+  root_uri: string
+  root_cid: string
+  author_did: string
+  domain: string
+  requested_at: number
+  replied_at: number | null
+}
+
+const insertReplyRequestStmt = db.prepare(`
+  INSERT INTO reply_requests (post_uri, post_cid, root_uri, root_cid, author_did, domain, requested_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(post_uri, domain) DO NOTHING
+`)
+
+const takePendingRepliesStmt = db.prepare(
+  `SELECT * FROM reply_requests WHERE domain = ? AND replied_at IS NULL ORDER BY requested_at ASC`,
+)
+
+const markRepliedStmt = db.prepare(
+  `UPDATE reply_requests SET replied_at = ? WHERE post_uri = ? AND domain = ?`,
+)
+
+const hasRepliedStmt = db.prepare(
+  `SELECT replied_at FROM reply_requests WHERE post_uri = ? AND domain = ?`,
+)
+
+/**
+ * Record a request from a Bluesky user to scan `domain` and reply to their post. Idempotent:
+ * a duplicate `(post_uri, domain)` is silently ignored, so re-processing the same
+ * Jetstream event after a restart can't queue a second reply.
+ */
+export function recordReplyRequest(input: {
+  postUri: string
+  postCid: string
+  rootUri: string
+  rootCid: string
+  authorDid: string
+  domain: string
+}): void {
+  insertReplyRequestStmt.run(
+    input.postUri,
+    input.postCid,
+    input.rootUri,
+    input.rootCid,
+    input.authorDid,
+    input.domain,
+    Date.now(),
+  )
+}
+
+/**
+ * Pending reply requests for `domain`. The caller is expected to post each one and then
+ * mark it sent via `markReplySent`; this function does not mutate state on its own so a
+ * crash mid-flush leaves the row pending for the next pass.
+ */
+export function pendingRepliesForDomain(domain: string): ReplyRequestRow[] {
+  return takePendingRepliesStmt.all(domain) as unknown as ReplyRequestRow[]
+}
+
+export function markReplySent(postUri: string, domain: string): void {
+  markRepliedStmt.run(Date.now(), postUri, domain)
+}
+
+/**
+ * True iff we've already sent a reply (or attempted one and recorded success) for this
+ * `(post_uri, domain)` pair. Used by the immediate-reply path to dedupe against the
+ * pending-flush path on the rare race where both run.
+ */
+export function hasReplied(postUri: string, domain: string): boolean {
+  const row = hasRepliedStmt.get(postUri, domain) as { replied_at: number | null } | undefined
+  return !!row?.replied_at
 }

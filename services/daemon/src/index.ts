@@ -3,14 +3,25 @@ import { fileURLToPath } from 'node:url'
 import { config } from './config.ts'
 import { log } from './log.ts'
 import { startJetstream } from './jetstream.ts'
-import { extractUrls } from './extract.ts'
+import { extractTrigger, extractUrls } from './extract.ts'
 import { canonicalDomain, normaliseUrl, shouldSkipDomain } from './domains.ts'
 import { Queue } from './queue.ts'
-import { getScan, recordCapture, recordDetection, recordDomainSeen } from './store.ts'
+import {
+  getScan,
+  hasReplied,
+  markReplySent,
+  pendingRepliesForDomain,
+  recordCapture,
+  recordDetection,
+  recordDomainSeen,
+  recordReplyRequest,
+} from './store.ts'
 import { startSubmitServer } from './submit-server.ts'
 import { captureForDomain, detectDomain, type DetectionOutcome } from './scan/index.ts'
 import { dispatchNotifications } from './pipeline.ts'
 import { type CaptureJob, loadQueueState, saveQueueState } from './queue-state.ts'
+import { getSelfDid } from './notify/bluesky-client.ts'
+import { replyWithScan, targetFromRow, type ReplyTarget } from './notify/bluesky-reply.ts'
 
 function runIngestScript(scriptName: string, label: string): Promise<void> {
   const script = fileURLToPath(new URL(`../scripts/${scriptName}`, import.meta.url))
@@ -50,6 +61,70 @@ let postsSeen = 0
 let urlsSeen = 0
 let domainsEnqueued = 0
 let nuxtFound = 0
+let triggerPostsSeen = 0
+let repliesPosted = 0
+
+let selfDid: string | null = null
+
+/**
+ * Maximum age of a stored scan that we'll serve directly to a user-requested reply.
+ * Older rows get a forced rescan: the requester explicitly asked, so a stale answer is
+ * worse than a small delay. Capped tighter than `RESCAN_AFTER_MS` (which targets the
+ * firehose path where bulk re-coverage is the goal).
+ */
+const REPLY_FRESHNESS_MS = Number(process.env.REPLY_FRESHNESS_MS || 24 * 60 * 60 * 1000)
+
+/**
+ * Flush every pending reply for `domain` using the row's current scan state. Called from
+ * both queue workers (detection-end for non-Nuxt / errored rows, capture-end for Nuxt
+ * rows) so a request that arrived while the scan was in flight gets a reply as soon as
+ * the result lands. Failures leave the row pending; a later flush will retry it.
+ */
+async function flushPendingReplies(domain: string): Promise<void> {
+  const pending = pendingRepliesForDomain(domain)
+  if (pending.length === 0) return
+  const scan = getScan(domain) ?? null
+  for (const row of pending) {
+    const target = targetFromRow(row)
+    try {
+      const ok = await replyWithScan(target, domain, scan)
+      if (ok) {
+        markReplySent(row.post_uri, domain)
+        repliesPosted++
+        log.success(`[bluesky-reply] replied to ${row.post_uri} for ${domain}`)
+      }
+    }
+    catch (err) {
+      log.error(`[bluesky-reply] flush failed for ${domain} -> ${row.post_uri}:`, (err as Error).message)
+    }
+  }
+}
+
+/**
+ * Try to satisfy a trigger immediately from the current scan row. Returns true iff the
+ * row is fresh enough to serve and we either posted a reply or recorded that one was
+ * already sent. On false, the caller should record a pending reply and enqueue a scan.
+ */
+async function tryImmediateReply(target: ReplyTarget, domain: string, authorDid: string): Promise<boolean> {
+  const scan = getScan(domain)
+  if (!scan) return false
+  if (Date.now() - scan.scanned_at > REPLY_FRESHNESS_MS) return false
+  if (hasReplied(target.postUri, domain)) return true
+  const ok = await replyWithScan(target, domain, scan)
+  if (!ok) return false
+  recordReplyRequest({
+    postUri: target.postUri,
+    postCid: target.postCid,
+    rootUri: target.rootUri,
+    rootCid: target.rootCid,
+    authorDid,
+    domain,
+  })
+  markReplySent(target.postUri, domain)
+  repliesPosted++
+  log.success(`[bluesky-reply] replied to ${target.postUri} for ${domain} (cached scan)`)
+  return true
+}
 
 /**
  * Detection worker: runs the cheap detection pipeline, persists the result, and (on a
@@ -95,12 +170,15 @@ async function handleDetection({ domain }: DetectionJob): Promise<void> {
         finalUrl: outcome.finalUrl,
         candidateOgImage: outcome.ogImage,
       })
+      // Capture worker will flush pending replies once the screenshot lands.
     }
     else if (outcome.error) {
       log.debug(`[detect] ${domain} error: ${outcome.error}`)
+      await flushPendingReplies(domain)
     }
     else {
       log.debug(`[detect] ${domain} not Nuxt`)
+      await flushPendingReplies(domain)
     }
   }
   finally {
@@ -129,6 +207,11 @@ async function handleCapture(job: CaptureJob): Promise<void> {
       nsfwClassifiedAt: captured.nsfwClassifiedAt,
       error: captured.error,
     })
+
+    // Pending user-requested replies fire as soon as the screenshot lands, before the
+    // firehose-notify dispatch. They use the row's current state so this works whether
+    // the request arrived before or during the capture.
+    await flushPendingReplies(job.domain)
 
     // Notifications need the full scan outcome shape; reconstruct from the persisted
     // detection row + the fresh capture result so the embed has both halves.
@@ -200,6 +283,22 @@ const submitServer = startSubmitServer({
   recordDomainSeen,
 })
 
+/**
+ * Canonical, skip-filtered, deduped domain list extracted from a Bluesky post's URLs.
+ * Shared between the firehose path (enqueue everything new) and the trigger path
+ * (target list for user-requested replies) so both apply the same filters.
+ */
+function domainsFromUrls(urls: string[]): Set<string> {
+  const out = new Set<string>()
+  for (const raw of urls) {
+    const normalised = normaliseUrl(raw)
+    if (!normalised) continue
+    if (shouldSkipDomain(normalised.hostname) || shouldSkipDomain(normalised.registrable)) continue
+    out.add(canonicalDomain(normalised.hostname))
+  }
+  return out
+}
+
 startJetstream({
   signal: controller.signal,
   onEvent: (event) => {
@@ -210,13 +309,7 @@ startJetstream({
     if (urls.length === 0) return
     urlsSeen += urls.length
 
-    const domainsInPost = new Set<string>()
-    for (const raw of urls) {
-      const normalised = normaliseUrl(raw)
-      if (!normalised) continue
-      if (shouldSkipDomain(normalised.hostname) || shouldSkipDomain(normalised.registrable)) continue
-      domainsInPost.add(canonicalDomain(normalised.hostname))
-    }
+    const domainsInPost = domainsFromUrls(urls)
 
     for (const domain of domainsInPost) {
       recordDomainSeen(domain)
@@ -227,12 +320,78 @@ startJetstream({
         log.debug(`[queue] +${domain} (detect=${detectionQueue.size + detectionQueue.active})`)
       }
     }
+
+    // User-requested replies: posts that @-mention our bot account get a per-domain reply
+    // built from the scan result. selfDid is resolved asynchronously at boot; until it's
+    // set this branch is a no-op (same as if Bluesky credentials weren't configured).
+    const trigger = extractTrigger(event, selfDid)
+    if (!trigger) return
+    const targetDomains = domainsFromUrls(trigger.urls)
+    // Don't reply about nuxt.fyi itself if the user happens to drop a link to it alongside
+    // the @-mention; that's almost certainly the mention's own profile/handle URL.
+    targetDomains.delete('nuxt.fyi')
+    if (targetDomains.size === 0) return
+    triggerPostsSeen++
+    log.info(`[trigger] ${trigger.post.uri} -> [${[...targetDomains].join(', ')}]`)
+    for (const domain of targetDomains) {
+      void handleTrigger(trigger.post, domain)
+    }
   },
 })
 
+/**
+ * Dispatch the reply path for a single `(post, domain)` pair: try to serve from the
+ * cached scan if it's recent enough, otherwise record the request and enqueue a scan so
+ * the worker can flush it on completion.
+ */
+async function handleTrigger(
+  post: { uri: string, cid: string, rootUri: string, rootCid: string, authorDid: string },
+  domain: string,
+): Promise<void> {
+  const target: ReplyTarget = {
+    postUri: post.uri,
+    postCid: post.cid,
+    rootUri: post.rootUri,
+    rootCid: post.rootCid,
+  }
+  if (hasReplied(post.uri, domain)) return
+  try {
+    if (await tryImmediateReply(target, domain, post.authorDid)) return
+  }
+  catch (err) {
+    log.error(`[trigger] immediate reply failed for ${domain}:`, (err as Error).message)
+  }
+  recordReplyRequest({
+    postUri: post.uri,
+    postCid: post.cid,
+    rootUri: post.rootUri,
+    rootCid: post.rootCid,
+    authorDid: post.authorDid,
+    domain,
+  })
+  if (!shouldSkipDomain(domain) && detectionQueue.enqueue({ domain })) {
+    domainsEnqueued++
+    log.debug(`[trigger] enqueued ${domain} for ${post.uri}`)
+  }
+}
+
 const statsInterval = setInterval(() => {
-  log.info(`[stats] posts=${postsSeen} urls=${urlsSeen} enqueued=${domainsEnqueued} detect=${detectionQueue.active}+${detectionQueue.size} capture=${captureQueue.active}+${captureQueue.size} nuxt=${nuxtFound}`)
+  log.info(`[stats] posts=${postsSeen} urls=${urlsSeen} enqueued=${domainsEnqueued} detect=${detectionQueue.active}+${detectionQueue.size} capture=${captureQueue.active}+${captureQueue.size} nuxt=${nuxtFound} triggers=${triggerPostsSeen} replies=${repliesPosted}`)
 }, 30_000)
+
+// Resolve the bot's own DID once at boot. Until this promise lands `extractTrigger`
+// short-circuits, so trigger handling is effectively a no-op for the first few seconds
+// of a process; that's preferable to issuing a synchronous network call from `onEvent`.
+void (async () => {
+  try {
+    selfDid = await getSelfDid()
+    if (selfDid) log.info(`[bluesky] self DID resolved: ${selfDid}`)
+    else log.warn('[bluesky] could not resolve self DID; @-mention replies disabled')
+  }
+  catch (err) {
+    log.warn(`[bluesky] self-DID resolution failed: ${(err as Error).message}`)
+  }
+})()
 
 let shuttingDown = false
 async function shutdown(signal: string): Promise<void> {
