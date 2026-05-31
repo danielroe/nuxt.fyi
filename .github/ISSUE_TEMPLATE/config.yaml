@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 👾 Chat
+    url: https://go.nuxt.com/discord
+    about: Our Discord server is active, come join us!
+  - name: 💁 Support
+    url: https://go.nuxt.com/discord
+    about: "This issue tracker is not for support questions. Join us on Discord for assistance!"
