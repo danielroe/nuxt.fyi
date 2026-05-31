@@ -59,8 +59,9 @@ const buckets = computed(() =>
 
 const WIDTH = 720
 const HEIGHT = 360
-const PADDING = { top: 18, right: 12, bottom: 32, left: 44 }
+const PADDING = { top: 18, right: 12, bottom: 56, left: 44 }
 const BAR_GAP = 4
+const MAJOR_GAP = 18
 
 /**
  * Round `max` up to a friendly axis ceiling (1, 2, 2.5, 5 * 10^n) so tick labels read
@@ -81,34 +82,108 @@ function fmtTick(n: number): string {
   return String(n)
 }
 
+interface MajorGroup {
+  major: number | 'unknown'
+  label: string
+  start: number
+  end: number
+  cx: number
+  count: number
+}
+
 const layout = computed(() => {
   const items = buckets.value
   const plotW = WIDTH - PADDING.left - PADDING.right
   const plotH = HEIGHT - PADDING.top - PADDING.bottom
   const n = items.length
-  const barW = n > 0 ? (plotW - BAR_GAP * Math.max(0, n - 1)) / n : 0
   const dataMax = items.reduce((m, b) => Math.max(m, b.count), 0)
   const yMax = niceCeil(dataMax)
   const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => ({
     value: yMax * t,
     y: PADDING.top + plotH * (1 - t),
   }))
-  const bars = items.map((b, i) => {
+
+  const majorKeys: Array<number | 'unknown'> = []
+  const majorCounts = new Map<number | 'unknown', number>()
+  for (const b of items) {
+    const key: number | 'unknown' = b.isUnknown ? 'unknown' : b.major
+    if (!majorCounts.has(key)) majorKeys.push(key)
+    majorCounts.set(key, (majorCounts.get(key) ?? 0) + 1)
+  }
+  const groupCount = majorKeys.length
+  const totalGaps = MAJOR_GAP * Math.max(0, groupCount - 1)
+  const totalBarGaps = items.reduce((sum, _, i) => {
+    if (i === 0) return sum
+    const prev = items[i - 1]!
+    const cur = items[i]!
+    const sameGroup = prev.isUnknown === cur.isUnknown && prev.major === cur.major
+    return sum + (sameGroup ? BAR_GAP : 0)
+  }, 0)
+  const barW = n > 0 ? (plotW - totalGaps - totalBarGaps) / n : 0
+
+  const bars = [] as Array<MinorBucket & {
+    x: number
+    y: number
+    w: number
+    h: number
+    cx: number
+    labelY: number
+    minorLabel: string
+  }>
+  let cursor = PADDING.left
+  const groups: MajorGroup[] = []
+  let groupStart = cursor
+  let groupKey: number | 'unknown' | null = null
+  for (let i = 0; i < items.length; i++) {
+    const b = items[i]!
+    const key: number | 'unknown' = b.isUnknown ? 'unknown' : b.major
+    if (groupKey === null) {
+      groupKey = key
+      groupStart = cursor
+    } else if (key !== groupKey) {
+      groups.push({
+        major: groupKey,
+        label: groupKey === 'unknown' ? 'unknown' : `${groupKey}.x`,
+        start: groupStart,
+        end: cursor - BAR_GAP,
+        cx: (groupStart + (cursor - BAR_GAP)) / 2,
+        count: majorCounts.get(groupKey) ?? 0,
+      })
+      cursor += MAJOR_GAP - BAR_GAP
+      groupKey = key
+      groupStart = cursor
+    }
     const h = yMax > 0 ? (b.count / yMax) * plotH : 0
-    return {
+    bars.push({
       ...b,
-      x: PADDING.left + i * (barW + BAR_GAP),
+      x: cursor,
       y: PADDING.top + plotH - h,
       w: barW,
       h,
-      cx: PADDING.left + i * (barW + BAR_GAP) + barW / 2,
+      cx: cursor + barW / 2,
       labelY: HEIGHT - PADDING.bottom + 14,
-    }
-  })
+      minorLabel: b.isUnknown ? '?' : String(b.minor),
+    })
+    cursor += barW + BAR_GAP
+  }
+  if (groupKey !== null) {
+    groups.push({
+      major: groupKey,
+      label: groupKey === 'unknown' ? 'unknown' : `${groupKey}.x`,
+      start: groupStart,
+      end: cursor - BAR_GAP,
+      cx: (groupStart + (cursor - BAR_GAP)) / 2,
+      count: majorCounts.get(groupKey) ?? 0,
+    })
+  }
+
   return {
     bars,
+    groups,
     ticks,
     baselineY: PADDING.top + plotH,
+    majorLabelY: HEIGHT - PADDING.bottom + 42,
+    groupRuleY: HEIGHT - PADDING.bottom + 32,
     plotLeft: PADDING.left,
     plotRight: WIDTH - PADDING.right,
   }
@@ -163,7 +238,7 @@ const layout = computed(() => {
         :x2="layout.plotRight"
         :y2="layout.baselineY"
       />
-      <g class="x-axis">
+      <g class="x-axis minor">
         <text
           v-for="b in layout.bars"
           :key="`x-${b.label}`"
@@ -171,7 +246,25 @@ const layout = computed(() => {
           :y="b.labelY"
           text-anchor="middle"
           dominant-baseline="hanging"
-        >{{ b.label }}</text>
+        >{{ b.minorLabel }}</text>
+      </g>
+      <g class="x-axis major">
+        <line
+          v-for="g in layout.groups"
+          :key="`rule-${g.label}`"
+          :x1="g.start"
+          :x2="g.end"
+          :y1="layout.groupRuleY"
+          :y2="layout.groupRuleY"
+        />
+        <text
+          v-for="g in layout.groups"
+          :key="`major-${g.label}`"
+          :x="g.cx"
+          :y="layout.majorLabelY"
+          text-anchor="middle"
+          dominant-baseline="hanging"
+        >{{ g.label }}</text>
       </g>
     </svg>
     <div class="sr-only">
@@ -220,6 +313,15 @@ const layout = computed(() => {
 .version-chart .y-axis text,
 .version-chart .x-axis text {
   fill: var(--muted);
+}
+.version-chart .x-axis.major text {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--fg, var(--muted));
+}
+.version-chart .x-axis.major line {
+  stroke: var(--border);
+  stroke-width: 1;
 }
 .version-chart .bars rect {
   fill: var(--accent);
