@@ -4,9 +4,9 @@
  * SQLite database. Numbers are roughly shaped like production but otherwise made up.
  */
 
-type Bucket = 'published' | 'off-registry' | 'unknown'
+import type { StatsResponse, VersionBucket } from '#shared/api'
 
-interface VersionRow { version: string, count: number, bucket: Bucket }
+interface VersionRow { version: string, count: number, bucket: VersionBucket }
 
 const now = Date.UTC(2025, 4, 28, 12, 0, 0)
 
@@ -47,7 +47,7 @@ const versions: VersionRow[] = [
 
 const nuxtHits = versions.reduce((sum, v) => sum + v.count, 0)
 
-export const fixtureStats = {
+export const fixtureStats: StatsResponse = {
   stats: {
     domains: 184_320,
     scans: 162_104,

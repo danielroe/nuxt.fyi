@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
+import type { APIResponse } from '#shared/api'
 
 const SORTS = ['scanned_at', 'rank', 'seen_count', 'confidence'] as const
 const ORDERS = ['asc', 'desc'] as const
@@ -34,7 +35,7 @@ useHead({
   },
 })
 
-const { data, pending } = await useFetch('/api/hits', {
+const { data, pending } = await useFetch<APIResponse<'/api/hits'>>('/api/hits', {
   query: computed(() => ({ page: page.value, version: version.value, sort: sort.value, order: order.value })),
 })
 

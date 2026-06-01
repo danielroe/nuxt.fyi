@@ -1,11 +1,11 @@
+import type { SubmitResult } from '#shared/api'
 import { rateLimit, sweep } from '../utils/rate-limit'
 
-interface DaemonResponse {
+// The daemon's wire shape mirrors `SubmitResult` but `ok` is genuinely boolean (we
+// branch on `ok === false` below) and an `error` field is carried for the 4xx/5xx
+// fan-out.
+interface DaemonResponse extends Omit<SubmitResult, 'ok'> {
   ok: boolean
-  domain?: string
-  status?: 'queued' | 'already-pending' | 'recently-scanned'
-  isNuxt?: boolean
-  scannedAt?: number
   error?: string
 }
 
@@ -22,7 +22,7 @@ const FIXTURES = !!process.env.NUXT_FIXTURES
 
 const buckets = new Map<string, { count: number, resetAt: number }>()
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (event): Promise<SubmitResult> => {
   if (FIXTURES) {
     return {
       ok: true,

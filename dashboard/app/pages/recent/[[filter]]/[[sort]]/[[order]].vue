@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
+import type { APIResponse } from '#shared/api'
 
 const FILTERS = ['nuxt-only', 'not-nuxt', 'errored', 'pending'] as const
 const SORTS = ['seen_count', 'first_seen', 'last_seen'] as const
@@ -43,7 +44,7 @@ const activeFilter = computed(
 const sort = computed<Sort>(() => (route.params.sort || 'last_seen') as Sort)
 const order = computed<Order>(() => (route.params.order || 'desc') as Order)
 
-const { data, pending } = await useFetch('/api/recent', {
+const { data, pending } = await useFetch<APIResponse<'/api/recent'>>('/api/recent', {
   query: computed(() => ({
     sort: sort.value,
     order: order.value,

@@ -1,7 +1,8 @@
+import type { HitDetailResponse, Signal } from '#shared/api'
 import { getDb, type ScanRow, type DomainRow, type NotificationRow } from '../../utils/db'
 import { imageSourcesFor } from '../../utils/image-url'
 
-export default defineEventHandler((event) => {
+export default defineEventHandler((event): HitDetailResponse => {
   const domain = getRouterParam(event, 'domain')
   if (!domain) throw createError({ statusCode: 400, statusMessage: 'domain required' })
 
@@ -22,7 +23,7 @@ export default defineEventHandler((event) => {
     scannedAt: scan.scanned_at,
     version: scan.nuxt_version,
     confidence: scan.confidence,
-    signals: (() => { try { return JSON.parse(scan.signals) as Array<{ name: string, weight: number, detail?: string }> } catch { return [] } })(),
+    signals: (() => { try { return JSON.parse(scan.signals) as Signal[] } catch { return [] } })(),
     finalUrl: scan.final_url,
     title: scan.title,
     error: scan.error,

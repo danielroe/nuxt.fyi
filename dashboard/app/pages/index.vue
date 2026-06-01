@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import type { APIResponse } from '#shared/api'
 import { fmtNumber } from '~/composables/format'
 
 definePageMeta({ name: 'index' })
 
 useHead({ title: 'Overview — nuxt.fyi' })
 
-const { data } = await useFetch('/api/stats')
+const { data } = await useFetch<APIResponse<'/api/stats'>>('/api/stats')
 
 const unverifiedCount = computed(() =>
   (data.value?.versions ?? [])

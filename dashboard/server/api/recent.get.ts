@@ -1,3 +1,4 @@
+import type { RecentResponse } from '#shared/api'
 import { getDb } from '../utils/db'
 
 /** Allowlist mapping URL-friendly sort names to SQL fragments. */
@@ -11,7 +12,7 @@ const SORTS: Record<string, string> = {
 
 const FILTERS = new Set(['all', 'nuxt', 'not-nuxt', 'error', 'pending'])
 
-export default defineCachedEventHandler((event) => {
+export default defineCachedEventHandler((event): RecentResponse => {
   const query = getQuery(event)
   const limit = Math.min(200, Math.max(1, Number(query.limit) || 100))
 

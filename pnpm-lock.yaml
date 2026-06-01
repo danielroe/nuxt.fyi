@@ -35,6 +35,9 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.12.4
+      fetchdts:
+        specifier: ^0.1.7
+        version: 0.1.7
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -1589,6 +1592,9 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fetchdts@0.1.7:
+    resolution: {integrity: sha512-YoZjBdafyLIop9lSxXVI33oLD5kN31q4Td+CasofLLYeLXRFeOsuOw0Uo+XNRi9PZlbfdlN2GmRtm4tCEQ9/KA==}
 
   form-data@4.0.5:
     resolution: {integrity: sha512-8RipRLol37bNs2bhoV67fiTEvdTrbMUYcFTiy3+wuuOnUog2QBHCZWXDRijWQfAkhBj2Uf5UnVaiWwA5vdd82w==}
@@ -4582,6 +4588,8 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.4):
     optionalDependencies:
       picomatch: 4.0.4
+
+  fetchdts@0.1.7: {}
 
   form-data@4.0.5:
     dependencies:

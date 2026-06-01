@@ -1,13 +1,6 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
-
-interface SubmitResult {
-  ok: true
-  domain: string
-  status: 'queued' | 'already-pending' | 'recently-scanned'
-  isNuxt?: boolean
-  scannedAt?: number
-}
+import { $apiFetch, type SubmitResult } from '#shared/api'
 
 const url = ref('')
 const submitting = ref(false)
@@ -24,7 +17,7 @@ async function onSubmit(): Promise<void> {
   result.value = null
   errorMessage.value = null
   try {
-    result.value = await $fetch<SubmitResult>('/api/submit', {
+    result.value = await $apiFetch('/api/submit', {
       method: 'POST',
       body: { url: trimmed },
     })
@@ -43,7 +36,7 @@ function detailLink(domain: string): RouteLocationRaw {
   return { name: 'hits-detail', params: { domain } }
 }
 
-const STATUS_COPY: Record<SubmitResult['status'], string> = {
+const STATUS_COPY: Record<NonNullable<SubmitResult['status']>, string> = {
   'queued': 'queued for scanning. Check back in a minute or two.',
   'already-pending': 'already in the scan queue. Hang tight.',
   'recently-scanned': 'already scanned recently.',
@@ -58,7 +51,7 @@ const STATUS_COPY: Record<SubmitResult['status'], string> = {
       {{ errorMessage }}
     </p>
 
-    <div v-if="result" class="status status-ok" role="status">
+    <div v-if="result && result.domain && result.status" class="status status-ok" role="status">
       <strong>{{ result.domain }}</strong>
       {{ STATUS_COPY[result.status] }}
       <NuxtLink v-if="result.status === 'recently-scanned'" :to="detailLink(result.domain)">

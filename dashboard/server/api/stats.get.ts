@@ -1,3 +1,4 @@
+import type { StatsResponse, VersionBucket } from '#shared/api'
 import { getDb } from '../utils/db'
 import { fixtureStats } from '../utils/fixtures'
 import { getPublishedNuxtVersions } from '../utils/nuxt-versions'
@@ -5,7 +6,7 @@ import { getPublishedNuxtVersions } from '../utils/nuxt-versions'
 interface CountRow { c: number }
 interface SignalListRow { signals: string }
 
-export default defineEventHandler(() => {
+export default defineEventHandler((): StatsResponse => {
   if (process.env.NUXT_FIXTURES) return fixtureStats
   const db = getDb()
   const c = (sql: string): number => (db.prepare(sql).get() as unknown as CountRow).c
@@ -38,7 +39,7 @@ export default defineEventHandler(() => {
   // falls back to 'published' so the dataset isn't silently mislabelled.
   const haveRegistry = published.size > 0
   const versions = rawVersions.map((row) => {
-    let bucket: 'published' | 'off-registry' | 'unknown'
+    let bucket: VersionBucket
     if (row.version === 'unknown') bucket = 'unknown'
     else if (!haveRegistry) bucket = 'published'
     else bucket = published.has(row.version) ? 'published' : 'off-registry'

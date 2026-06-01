@@ -1,4 +1,5 @@
 import type { SQLInputValue } from 'node:sqlite'
+import type { HitsResponse, Signal } from '#shared/api'
 import { getDb, type ScanRow } from '../utils/db'
 import { imageSourcesFor } from '../utils/image-url'
 
@@ -13,7 +14,7 @@ const SORTS: Record<string, string> = {
   rank: 'tranco_rank_value',
 }
 
-export default defineCachedEventHandler((event) => {
+export default defineCachedEventHandler((event): HitsResponse => {
   const db = getDb()
   const query = getQuery(event)
   const page = Math.max(1, Number(query.page) || 1)
@@ -70,7 +71,7 @@ export default defineCachedEventHandler((event) => {
       scannedAt: r.scanned_at,
       version: r.nuxt_version,
       confidence: r.confidence,
-      signals: (() => { try { return JSON.parse(r.signals) as Array<{ name: string, weight: number, detail?: string }> } catch { return [] } })(),
+      signals: (() => { try { return JSON.parse(r.signals) as Signal[] } catch { return [] } })(),
       finalUrl: r.final_url,
       title: r.title,
       image: imageSourcesFor(r.og_image, r.screenshot_key, r.og_image_key, r.nsfw_label),
