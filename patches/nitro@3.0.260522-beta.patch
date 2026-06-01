@@ -1,0 +1,51 @@
+diff --git a/dist/_build/common.mjs b/dist/_build/common.mjs
+index 9b93ea16ab52cf397ec766dacc0dfd1c9a560dc1..5c4c5162668d74ccdeb180753789cbd5a7cd7d36 100644
+--- a/dist/_build/common.mjs
++++ b/dist/_build/common.mjs
+@@ -20788,6 +20788,7 @@ async function writeTypes(nitro) {
+ 			const from = i.typeFrom || i.from;
+ 			if (resolvedImportPathMap.has(from)) continue;
+ 			let path = resolveAlias(from, nitro.options.alias);
++			let usePackageSubpath = false;
+ 			if (!isAbsolute$2(path)) {
+ 				const resolvedPath = resolveModulePath(from, {
+ 					try: true,
+@@ -20810,10 +20811,24 @@ async function writeTypes(nitro) {
+ 				if (resolvedPath) {
+ 					const { dir, name } = parseNodeModulePath(resolvedPath);
+ 					if (!dir || !name) path = resolvedPath;
+-					else path = join$2(dir, name, await lookupNodeModuleSubpath(resolvedPath) || "");
++					else {
++						const subpath = await lookupNodeModuleSubpath(resolvedPath) || "";
++						path = join$2(dir, name, subpath);
++						// A package subpath (e.g. `nitro/h3`) maps to a file via the package's
++						// `exports` field; the joined path doesn't exist on disk. Writing it as
++						// a relative path leaves TS unable to resolve `typeof import('relative/.../nitro/h3')`,
++						// so emit the bare specifier and let TS's package resolution honour `exports`.
++						if (subpath) usePackageSubpath = true;
++					}
+ 				}
+ 			}
+-			if (existsSync(path) && !await isDirectory(path)) path = path.replace(/\.[a-z]+$/, "");
++			if (usePackageSubpath) {
++				path = from;
++			} else {
++				// Only strip extensions TS retries on its own. `.d.mts`/`.d.cts` aren't
++				// in that retry list, so leave them on.
++				if (existsSync(path) && !await isDirectory(path)) path = path.replace(/\.(?:tsx?|jsx?|[cm]js)$/, "");
++			}
+ 			if (isAbsolute$2(path)) path = relative$2(generatedTypesDir, path);
+ 			resolvedImportPathMap.set(from, path);
+ 		}
+@@ -20913,7 +20928,10 @@ async function writeTypes(nitro) {
+ 		for (const alias in tsConfig.compilerOptions.paths) {
+ 			const paths = await Promise.all(tsConfig.compilerOptions.paths[alias].map(async (path) => {
+ 				if (!isAbsolute$2(path)) return path;
+-				return relativeWithDot(tsconfigDir, (await promises.stat(path).catch(() => null))?.isFile() ? path.replace(/(?<=\w)\.\w+$/g, "") : path);
++				// Only strip extensions TS retries from a bare `paths` candidate.
++				// `.d.mts`/`.d.cts` aren't in the retry list, so leave them on.
++				// https://github.com/nitrojs/nitro/pull/4297
++				return relativeWithDot(tsconfigDir, (await promises.stat(path).catch(() => null))?.isFile() ? path.replace(/\.(?:tsx?|jsx?|[cm]js)$/, "") : path);
+ 			}));
+ 			tsConfig.compilerOptions.paths[alias] = [...new Set(paths)];
+ 		}

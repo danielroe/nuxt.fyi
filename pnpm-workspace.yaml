@@ -10,3 +10,10 @@ allowBuilds:
   sharp: true
 minimumReleaseAgeExclude:
   - '@atproto/api@0.20.6'
+  - '@nuxt/kit-nightly@5.0.0-29671099.144c0d1b'
+  - '@nuxt/nitro-server-nightly@5.0.0-29671099.144c0d1b'
+  - '@nuxt/schema-nightly@5.0.0-29671099.144c0d1b'
+  - '@nuxt/vite-builder-nightly@5.0.0-29671099.144c0d1b'
+  - nuxt-nightly@5.0.0-29671099.144c0d1b
+patchedDependencies:
+  nitro@3.0.260522-beta: patches/nitro@3.0.260522-beta.patch

@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'x-ratelimit-remaining', String(gate.remaining))
   setResponseHeader(event, 'x-ratelimit-reset', String(Math.ceil(gate.resetAt / 1000)))
   if (!gate.ok) {
-    setResponseHeader(event, 'retry-after', Math.ceil((gate.resetAt - Date.now()) / 1000))
+    setResponseHeader(event, 'retry-after', String(Math.ceil((gate.resetAt - Date.now()) / 1000)))
     throw createError({ statusCode: 429, statusMessage: 'Too Many Requests', message: 'too many submissions; try again shortly' })
   }
 
