@@ -6,6 +6,7 @@ RUN corepack enable
 # Build context is the repo root (see `[build] dockerfile = ...` in fly.toml). We need
 # every package.json reachable so `pnpm install` can resolve the workspace graph.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY patches/ ./patches/
 COPY services/daemon/package.json services/daemon/
 COPY services/scanner/package.json services/scanner/
 COPY dashboard/package.json dashboard/

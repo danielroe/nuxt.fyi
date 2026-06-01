@@ -4,6 +4,7 @@ WORKDIR /repo
 RUN corepack enable
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY patches/ ./patches/
 COPY services/daemon/package.json services/daemon/
 COPY services/scanner/package.json services/scanner/
 COPY dashboard/package.json dashboard/
@@ -41,6 +42,7 @@ RUN corepack enable
 # disk, so we re-install scanner deps here. This is a small image anyway since there's
 # no SQLite, no Nuxt, no @atproto/api.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY patches/ ./patches/
 COPY services/scanner/package.json services/scanner/
 # We omit --ignore-scripts so tfjs-node's postinstall fetches libtensorflow during the
 # build. Playwright's postinstall also runs (cheap; we still call `playwright install`
