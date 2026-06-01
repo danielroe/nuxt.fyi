@@ -1,5 +1,5 @@
 import { defineHandler } from 'nitro'
-import { readBody } from 'h3'
+import { readBody } from 'nitro/h3'
 import { consola } from 'consola'
 import { screenshot } from '../src/headless.ts'
 import { uploadScreenshot } from '../src/imagekit.ts'

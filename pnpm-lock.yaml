@@ -79,9 +79,6 @@ importers:
       consola:
         specifier: ^3.4.0
         version: 3.4.2
-      h3:
-        specifier: ^2.0.1-rc.22
-        version: 2.0.1-rc.22(crossws@0.4.5(srvx@0.11.16))
       nitro:
         specifier: ^3.0.260522-beta
         version: 3.0.260522-beta(patch_hash=2b48b8a4bb17b64ee61e609600aed3f8ef235c022cf56770811d9f5f0c84325d)(chokidar@5.0.0)(dotenv@17.4.2)(giget@3.2.0)(jiti@2.7.0)(lru-cache@11.5.1)(vite@8.0.14(@types/node@24.12.4)(jiti@2.7.0)(yaml@2.9.0))
