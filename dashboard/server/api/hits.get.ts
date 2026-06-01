@@ -1,4 +1,6 @@
 import type { SQLInputValue } from 'node:sqlite'
+import { defineCachedHandler } from 'nitro/cache'
+import { getQuery } from 'nitro/h3'
 import type { HitsResponse, Signal } from '#shared/api'
 import { getDb, type ScanRow } from '../utils/db'
 import { imageSourcesFor } from '../utils/image-url'
@@ -14,7 +16,7 @@ const SORTS: Record<string, string> = {
   rank: 'tranco_rank_value',
 }
 
-export default defineCachedEventHandler((event): HitsResponse => {
+export default defineCachedHandler((event): HitsResponse => {
   const db = getDb()
   const query = getQuery(event)
   const page = Math.max(1, Number(query.page) || 1)

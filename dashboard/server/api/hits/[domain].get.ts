@@ -1,14 +1,15 @@
+import { defineHandler, getRouterParam, HTTPError } from 'nitro/h3'
 import type { HitDetailResponse, Signal } from '#shared/api'
 import { getDb, type ScanRow, type DomainRow, type NotificationRow } from '../../utils/db'
 import { imageSourcesFor } from '../../utils/image-url'
 
-export default defineEventHandler((event): HitDetailResponse => {
+export default defineHandler((event): HitDetailResponse => {
   const domain = getRouterParam(event, 'domain')
-  if (!domain) throw createError({ statusCode: 400, statusMessage: 'domain required' })
+  if (!domain) throw new HTTPError({ statusCode: 400, statusMessage: 'domain required' })
 
   const db = getDb()
   const scan = db.prepare(`SELECT * FROM scans WHERE domain = ?`).get(domain) as unknown as ScanRow | undefined
-  if (!scan) throw createError({ statusCode: 404, statusMessage: 'not found' })
+  if (!scan) throw new HTTPError({ statusCode: 404, statusMessage: 'not found' })
 
   const seen = db.prepare(`SELECT * FROM domains WHERE domain = ?`).get(domain) as unknown as DomainRow | undefined
   const notifications = db.prepare(`SELECT * FROM notifications WHERE domain = ? ORDER BY posted_at`).all(domain) as unknown as NotificationRow[]

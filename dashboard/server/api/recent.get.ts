@@ -1,3 +1,5 @@
+import { defineCachedHandler } from 'nitro/cache'
+import { getQuery } from 'nitro/h3'
 import type { RecentResponse } from '#shared/api'
 import { getDb } from '../utils/db'
 
@@ -12,7 +14,7 @@ const SORTS: Record<string, string> = {
 
 const FILTERS = new Set(['all', 'nuxt', 'not-nuxt', 'error', 'pending'])
 
-export default defineCachedEventHandler((event): RecentResponse => {
+export default defineCachedHandler((event): RecentResponse => {
   const query = getQuery(event)
   const limit = Math.min(200, Math.max(1, Number(query.limit) || 100))
 

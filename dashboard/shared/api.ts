@@ -2,13 +2,7 @@
  * Response shapes for the API endpoints served from `server/api/`
  */
 
-import type {
-  DynamicParam,
-  Endpoint,
-  TypedFetchInput,
-  TypedFetchRequestInit,
-  TypedFetchResponseBody,
-} from 'fetchdts'
+import type { DynamicParam, Endpoint, TypedFetchInput, TypedFetchRequestInit, TypedFetchResponseBody } from 'fetchdts'
 
 export type VersionBucket = 'published' | 'off-registry' | 'unknown'
 export type NsfwLabel = 'safe' | 'suggestive' | 'nsfw'

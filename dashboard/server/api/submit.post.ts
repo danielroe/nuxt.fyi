@@ -1,3 +1,4 @@
+import { defineHandler, getRequestIP, HTTPError, readBody } from 'nitro/h3'
 import type { SubmitResult } from '#shared/api'
 import { rateLimit, sweep } from '../utils/rate-limit'
 
@@ -22,7 +23,7 @@ const FIXTURES = !!process.env.NUXT_FIXTURES
 
 const buckets = new Map<string, { count: number, resetAt: number }>()
 
-export default defineEventHandler(async (event): Promise<SubmitResult> => {
+export default defineHandler(async (event): Promise<SubmitResult> => {
   if (FIXTURES) {
     return {
       ok: true,
@@ -35,37 +36,37 @@ export default defineEventHandler(async (event): Promise<SubmitResult> => {
   sweep(buckets)
   // `fly-client-ip` is the trusted source on Fly. Fall back to standard headers for
   // local dev where the request comes straight off the loopback interface.
-  const ip = getRequestHeader(event, 'fly-client-ip')
-    ?? getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim()
+  const ip = event.req.headers.get('fly-client-ip')
+    ?? event.req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     ?? getRequestIP(event, { xForwardedFor: true })
     ?? 'unknown'
 
   const gate = rateLimit(buckets, ip, RATE_LIMIT, RATE_WINDOW_MS)
-  setResponseHeader(event, 'x-ratelimit-limit', String(RATE_LIMIT))
-  setResponseHeader(event, 'x-ratelimit-remaining', String(gate.remaining))
-  setResponseHeader(event, 'x-ratelimit-reset', String(Math.ceil(gate.resetAt / 1000)))
+  event.res.headers.set('x-ratelimit-limit', String(RATE_LIMIT))
+  event.res.headers.set('x-ratelimit-remaining', String(gate.remaining))
+  event.res.headers.set('x-ratelimit-reset', String(Math.ceil(gate.resetAt / 1000)))
   if (!gate.ok) {
-    setResponseHeader(event, 'retry-after', String(Math.ceil((gate.resetAt - Date.now()) / 1000)))
-    throw createError({ statusCode: 429, statusMessage: 'Too Many Requests', message: 'too many submissions; try again shortly' })
+    event.res.headers.set('retry-after', String(Math.ceil((gate.resetAt - Date.now()) / 1000)))
+    throw new HTTPError({ statusCode: 429, statusMessage: 'Too Many Requests', message: 'too many submissions; try again shortly' })
   }
 
   const body = await readBody<SubmitBody>(event).catch(() => null)
   const url = body && typeof body.url === 'string' ? body.url.trim() : ''
-  if (!url) throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'missing url' })
-  if (url.length > 512) throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'url too long' })
+  if (!url) throw new HTTPError({ statusCode: 400, statusMessage: 'Bad Request', message: 'missing url' })
+  if (url.length > 512) throw new HTTPError({ statusCode: 400, statusMessage: 'Bad Request', message: 'url too long' })
 
   // Cheap pre-check so we can fail fast without paying the daemon round-trip on
   // obviously-bad input. The daemon re-runs the full canonical/skip logic via tldts.
   const candidate = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`
   let parsed: URL
   try { parsed = new URL(candidate) }
-  catch { throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'invalid url' }) }
+  catch { throw new HTTPError({ statusCode: 400, statusMessage: 'Bad Request', message: 'invalid url' }) }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'only http(s) urls are supported' })
+    throw new HTTPError({ statusCode: 400, statusMessage: 'Bad Request', message: 'only http(s) urls are supported' })
   }
 
   if (!DAEMON_TOKEN) {
-    throw createError({ statusCode: 503, statusMessage: 'Service Unavailable', message: 'submit endpoint is not configured' })
+    throw new HTTPError({ statusCode: 503, statusMessage: 'Service Unavailable', message: 'submit endpoint is not configured' })
   }
 
   let daemonRes: Response
@@ -84,13 +85,27 @@ export default defineEventHandler(async (event): Promise<SubmitResult> => {
   }
   catch (err) {
     console.error('[submit] daemon unreachable', err)
-    throw createError({ statusCode: 502, statusMessage: 'Bad Gateway', message: 'daemon unreachable' })
+    throw new HTTPError({ statusCode: 502, statusMessage: 'Bad Gateway', message: 'daemon unreachable' })
   }
 
-  const payload = await daemonRes.json().catch(() => null) as DaemonResponse | null
+  // Read the body once as text so we can log the raw response on failure. Parse it
+  // ourselves; the daemon always emits JSON, but if the body isn't JSON we want the raw
+  // text in the server log rather than silently swallowing it.
+  const rawBody = await daemonRes.text().catch(() => '')
+  let payload: DaemonResponse | null = null
+  try { payload = JSON.parse(rawBody) as DaemonResponse } catch { /* non-JSON */ }
   if (!daemonRes.ok || !payload || !payload.ok) {
+    if (!daemonRes.ok || !payload) {
+      console.error('[submit] daemon error', {
+        url: `${DAEMON_URL}/submit`,
+        status: daemonRes.status,
+        statusText: daemonRes.statusText,
+        contentType: daemonRes.headers.get('content-type'),
+        body: rawBody.slice(0, 500),
+      })
+    }
     const message = payload?.error || `daemon returned ${daemonRes.status}`
-    throw createError({ statusCode: daemonRes.status >= 500 ? 502 : 400, statusMessage: 'Submit Failed', message })
+    throw new HTTPError({ statusCode: daemonRes.status >= 500 ? 502 : 400, statusMessage: 'Submit Failed', message })
   }
 
   return {
