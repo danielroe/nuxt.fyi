@@ -1,0 +1,21 @@
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 9d220c722f7a79e2f6f219ece6562ce9bf4dfaa0..e7429658a291419d37383e37767f6bc6d6b5f7a0 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -7115,13 +7115,14 @@ if (!("global" in globalThis)) {
+ const dollarFetchTemplate = {
+ 	filename: "fetch.server.mjs",
+ 	getContents() {
++		// TODO: https://github.com/nuxt/nuxt/pull/34989
+ 		return [
+ 			"import { $fetch } from 'ofetch'",
+ 			"import { baseURL } from '#internal/nuxt/paths'",
+-			"import { serverFetch } from \"nitro\";",
+-			"globalThis.fetch = serverFetch",
++			"import { fetch } from 'nitro'",
+ 			"if (!globalThis.$fetch) {",
+ 			"  globalThis.$fetch = $fetch.create({",
++			"    fetch,",
+ 			"    baseURL: baseURL()",
+ 			"  })",
+ 			"}"
