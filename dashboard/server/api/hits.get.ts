@@ -2,6 +2,7 @@ import type { SQLInputValue } from 'node:sqlite'
 import { defineCachedHandler } from 'nitro/cache'
 import { getQuery } from 'nitro/h3'
 import type { HitsResponse, Signal } from '#shared/api'
+import { sanitizeSearchTerm } from '#shared/utils/search-term'
 import { getDb, type ScanRow } from '../utils/db'
 import { imageSourcesFor } from '../utils/image-url'
 
@@ -14,12 +15,6 @@ const SORTS: Record<string, string> = {
   confidence: 's.confidence',
   seen_count: 'd.seen_count',
   rank: 'tranco_rank_value',
-}
-
-function sanitizeQ(raw: unknown): string {
-  if (typeof raw !== 'string') return ''
-  // Cap length, strip ASCII control chars, trim whitespace.
-  return raw.slice(0, 100).replace(/[\u0000-\u001f\u007f]/g, '').trim()
 }
 
 function escapeLike(s: string): string {
@@ -54,7 +49,7 @@ export default defineCachedHandler((event): HitsResponse => {
     }
   }
 
-  const q = sanitizeQ(query.q)
+  const q = sanitizeSearchTerm(query.q)
   if (q) {
     where += ` AND (LOWER(s.domain) LIKE ? ESCAPE '\\' OR LOWER(IFNULL(s.title, '')) LIKE ? ESCAPE '\\')`
     const term = `%${escapeLike(q).toLowerCase()}%`
