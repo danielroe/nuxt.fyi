@@ -16,6 +16,16 @@ const SORTS: Record<string, string> = {
   rank: 'tranco_rank_value',
 }
 
+function sanitizeQ(raw: unknown): string {
+  if (typeof raw !== 'string') return ''
+  // Cap length, strip ASCII control chars, trim whitespace.
+  return raw.slice(0, 100).replace(/[\u0000-\u001f\u007f]/g, '').trim()
+}
+
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, m => `\\${m}`)
+}
+
 export default defineCachedHandler((event): HitsResponse => {
   const db = getDb()
   const query = getQuery(event)
@@ -42,6 +52,13 @@ export default defineCachedHandler((event): HitsResponse => {
       where += ` AND s.nuxt_version = ?`
       params.push(version)
     }
+  }
+
+  const q = sanitizeQ(query.q)
+  if (q) {
+    where += ` AND (LOWER(s.domain) LIKE ? ESCAPE '\\' OR LOWER(IFNULL(s.title, '')) LIKE ? ESCAPE '\\')`
+    const term = `%${escapeLike(q).toLowerCase()}%`
+    params.push(term, term)
   }
 
   const total = (db.prepare(`SELECT COUNT(*) AS c FROM scans s WHERE ${where}`).get(...params) as unknown as { c: number }).c
@@ -86,6 +103,6 @@ export default defineCachedHandler((event): HitsResponse => {
   maxAge: 1,
   getKey: event => {
     const query = getQuery(event)
-    return `hits:${query.page ?? 1}:${query.version ?? 'all'}:${query.sort ?? 'scanned_at'}:${query.order ?? 'desc'}`
+    return `hits:${query.page ?? 1}:${query.version ?? 'all'}:${query.sort ?? 'scanned_at'}:${query.order ?? 'desc'}:${query.q ?? ''}`
   }
 })
