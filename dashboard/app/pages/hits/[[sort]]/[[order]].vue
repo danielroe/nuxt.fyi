@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
 import type { APIResponse } from '#shared/api'
+import { sanitizeSearchTerm } from '#shared/utils/search-term'
 
 const SORTS = ['scanned_at', 'rank', 'seen_count', 'confidence'] as const
 const ORDERS = ['asc', 'desc'] as const
@@ -31,7 +32,7 @@ const searchTerm = computed(() => typeof route.query.q === 'string' ? route.quer
 const inputEl = ref<HTMLInputElement | null>(null)
 const router = useRouter()
 
-let timer: ReturnType<typeof setTimeout> | null = null
+let inputDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 useHead({
   title: () => {
@@ -92,31 +93,31 @@ function buildNextQuery(trimmed: string): Record<string, string> {
   return next
 }
 
-function commit(trimmed: string) {
-  const next = buildNextQuery(trimmed)
+function commit(rawTerm: string) {
+  const term = sanitizeSearchTerm(rawTerm)
+  const next = buildNextQuery(term)
   if (queryEqual(next, route.query as Record<string, unknown>)) return
   router.replace({ name: 'hits-list', params: { sort: sort.value, order: order.value }, query: next })
 }
 
 function scheduleUpdate() {
-  if (timer) clearTimeout(timer)
-  const trimmed = search.value.trim()
-  timer = setTimeout(() => commit(trimmed), 300)
+  if (inputDebounceTimer) clearTimeout(inputDebounceTimer)
+  inputDebounceTimer = setTimeout(() => commit(search.value), 300)
 }
 
 function commitNow() {
-  if (timer) { clearTimeout(timer); timer = null }
-  commit(search.value.trim())
+  if (inputDebounceTimer) { clearTimeout(inputDebounceTimer); inputDebounceTimer = null }
+  commit(search.value)
 }
 
 function clearSearch() {
-  if (timer) { clearTimeout(timer); timer = null }
+  if (inputDebounceTimer) { clearTimeout(inputDebounceTimer); inputDebounceTimer = null }
   search.value = ''
   commit('')
   nextTick(() => inputEl.value?.focus())
 }
 
-onUnmounted(() => { if (timer) clearTimeout(timer) })
+onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
 </script>
 
 <template>
