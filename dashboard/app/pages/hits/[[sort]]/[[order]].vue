@@ -36,7 +36,7 @@ useHead({
 })
 
 const { data, pending } = await useFetch<APIResponse<'/api/hits'>>('/api/hits', {
-  query: computed(() => ({ page: page.value, version: version.value, sort: sort.value, order: order.value })),
+  query: computed(() => ({ page: page.value, version: version.value, sort: sort.value, order: order.value, q: searchTerm.value })),
 })
 
 /** Sort pill: navigates to /hits/<sort>/<order>, dropping the page param since order changes. */
@@ -62,6 +62,61 @@ function detailPath(domain: string): RouteLocationRaw {
     query: { ...route.query, sort: sort.value, order: order.value },
   }
 }
+
+const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
+const searchTerm = computed(() => typeof route.query.q === 'string' ? route.query.q : '')
+const inputEl = ref<HTMLInputElement | null>(null)
+const router = useRouter()
+
+let timer: ReturnType<typeof setTimeout> | null = null
+
+/** Deep-equal for the subset of LocationQuery we care about (flat string|null|undefined). */
+function queryEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const aKeys = Object.keys(a).filter(k => a[k] !== undefined)
+  const bKeys = Object.keys(b).filter(k => b[k] !== undefined)
+  if (aKeys.length !== bKeys.length) return false
+  for (const k of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false
+    if (String(a[k]) !== String(b[k])) return false
+  }
+  return true
+}
+
+function buildNextQuery(trimmed: string): Record<string, string> {
+  const next: Record<string, string> = {}
+  for (const [k, v] of Object.entries(route.query)) {
+    if (k === 'q' || k === 'page') continue
+    if (typeof v === 'string') next[k] = v
+  }
+  if (trimmed) next.q = trimmed
+  return next
+}
+
+function commit(trimmed: string) {
+  const next = buildNextQuery(trimmed)
+  if (queryEqual(next, route.query as Record<string, unknown>)) return
+  router.replace({ name: 'hits-list', params: { sort: sort.value, order: order.value }, query: next })
+}
+
+function scheduleUpdate() {
+  if (timer) clearTimeout(timer)
+  const trimmed = search.value.trim()
+  timer = setTimeout(() => commit(trimmed), 300)
+}
+
+function commitNow() {
+  if (timer) { clearTimeout(timer); timer = null }
+  commit(search.value.trim())
+}
+
+function clearSearch() {
+  if (timer) { clearTimeout(timer); timer = null }
+  search.value = ''
+  commit('')
+  nextTick(() => inputEl.value?.focus())
+}
+
+onUnmounted(() => { if (timer) clearTimeout(timer) })
 </script>
 
 <template>
@@ -71,7 +126,7 @@ function detailPath(domain: string): RouteLocationRaw {
       <span v-if="data" class="muted small">({{ data.total }})</span>
     </h1>
 
-    <nav class="controls" aria-label="Sort sites">
+    <nav class="controls" aria-label="Sort and search sites">
       <span id="sort-label" class="control-label">sort:</span>
       <NuxtLink
         v-for="opt in SORT_OPTIONS"
@@ -80,11 +135,26 @@ function detailPath(domain: string): RouteLocationRaw {
         :class="['sort-link', { active: sort === opt.key }]"
         :aria-current="sort === opt.key ? 'true' : undefined"
       >{{ opt.label }}</NuxtLink>
+      <span class="search-control">
+        <label for="hits-search" class="control-label">search:</label>
+        <input
+          id="hits-search"
+          ref="inputEl"
+          v-model="search"
+          type="search"
+          placeholder="filter sites…"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Filter sites by domain or title"
+          @input="scheduleUpdate"
+          @keydown.enter.prevent="commitNow"
+        >
+      </span>
     </nav>
 
-    <div v-if="pending && !data" role="status" aria-live="polite" class="muted">loading…</div>
+    <div v-if="pending" role="status" aria-live="polite" class="muted">loading…</div>
 
-    <ul v-if="data" class="grid" role="list">
+    <ul v-if="data && data.hits.length > 0" class="grid" role="list">
       <li v-for="(hit, index) in data.hits" :key="hit.domain">
         <NuxtLink :to="detailPath(hit.domain)" class="hit">
           <div class="thumb">
@@ -111,6 +181,16 @@ function detailPath(domain: string): RouteLocationRaw {
       </li>
     </ul>
 
+    <p v-else-if="data" class="muted empty" role="status">
+      no sites match this filter
+      <button
+        v-if="searchTerm"
+        type="button"
+        class="empty-clear"
+        @click="clearSearch"
+      >clear search</button>
+    </p>
+
     <nav v-if="data && data.pageCount > 1" class="pagination" aria-label="Pagination">
       <NuxtLink
         v-if="page > 1"
@@ -134,7 +214,15 @@ function detailPath(domain: string): RouteLocationRaw {
 </template>
 
 <style scoped>
-.controls { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; align-items: baseline; }
+.controls { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; align-items: center; }
+.search-control { margin-left: auto; display: inline-flex; align-items: center; gap: 0.4rem; }
+.search-control input { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 3px; padding: 0.25rem 0.6rem; font: inherit; font-size: 0.85rem; min-width: 12rem; }
+.search-control input:focus-visible { border-color: var(--accent); outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.search-control input::-webkit-search-cancel-button { cursor: pointer; }
+.empty { margin: 2rem 0; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.empty-clear { background: transparent; border: 1px solid var(--border); color: var(--accent); padding: 0.2rem 0.6rem; font-family: inherit; font-size: 0.85rem; border-radius: 3px; cursor: pointer; }
+.empty-clear:hover { border-color: var(--accent); }
+.empty-clear:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .control-label { color: var(--muted); font-size: 0.85rem; }
 .sort-link { display: inline-block; background: transparent; border: 1px solid var(--border); color: var(--fg); padding: 0.25rem 0.75rem; font-family: inherit; font-size: 0.85rem; border-radius: 3px; text-decoration: none; }
 .sort-link:hover { border-color: var(--accent); }
