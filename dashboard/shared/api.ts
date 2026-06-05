@@ -122,7 +122,7 @@ export interface SubmitResult {
 export interface APISchema {
   '/api/stats': { [Endpoint]: { GET: { response: StatsResponse } } }
   '/api/hits': {
-    [Endpoint]: { GET: { response: HitsResponse } }
+    [Endpoint]: { GET: { response: HitsResponse, query: { q?: string } } }
     [DynamicParam]: { [Endpoint]: { GET: { response: HitDetailResponse } } }
   }
   '/api/recent': { [Endpoint]: { GET: { response: RecentResponse } } }
