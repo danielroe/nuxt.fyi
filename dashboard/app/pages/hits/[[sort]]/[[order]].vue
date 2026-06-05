@@ -26,6 +26,13 @@ const version = computed(() => typeof route.query.version === 'string' ? route.q
 const sort = computed<Sort>(() => (route.params.sort || 'scanned_at') as Sort)
 const order = computed<Order>(() => (route.params.order || 'desc') as Order)
 
+const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
+const searchTerm = computed(() => typeof route.query.q === 'string' ? route.query.q : '')
+const inputEl = ref<HTMLInputElement | null>(null)
+const router = useRouter()
+
+let timer: ReturnType<typeof setTimeout> | null = null
+
 useHead({
   title: () => {
     const opt = SORT_OPTIONS.find(o => o.key === sort.value)
@@ -62,13 +69,6 @@ function detailPath(domain: string): RouteLocationRaw {
     query: { ...route.query, sort: sort.value, order: order.value },
   }
 }
-
-const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
-const searchTerm = computed(() => typeof route.query.q === 'string' ? route.query.q : '')
-const inputEl = ref<HTMLInputElement | null>(null)
-const router = useRouter()
-
-let timer: ReturnType<typeof setTimeout> | null = null
 
 /** Deep-equal for the subset of LocationQuery we care about (flat string|null|undefined). */
 function queryEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
