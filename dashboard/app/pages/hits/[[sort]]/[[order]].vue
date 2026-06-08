@@ -153,7 +153,7 @@ onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
       </span>
     </nav>
 
-    <div v-if="pending" role="status" aria-live="polite" class="muted">loading…</div>
+    <div v-if="pending && !data" role="status" aria-live="polite" class="muted">loading…</div>
 
     <ul v-if="data && data.hits.length > 0" class="grid" role="list">
       <li v-for="(hit, index) in data.hits" :key="hit.domain">
