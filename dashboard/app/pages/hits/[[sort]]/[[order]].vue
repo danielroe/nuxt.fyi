@@ -55,6 +55,11 @@ watch(data, value => {
   }
 })
 
+/** Keep the input in sync with the URL for back/forward and external navigations. */
+watch(searchTerm, value => {
+  if (value !== search.value) search.value = value
+})
+
 /** Sort pill: navigates to /hits/<sort>/<order>, dropping the page param since order changes. */
 function sortPath(opt: typeof SORT_OPTIONS[number]): RouteLocationRaw {
   const { page: _omit, ...rest } = route.query
