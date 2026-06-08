@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
 import type { APIResponse } from '#shared/api'
+import { sanitizeSearchTerm } from '#shared/utils/search-term'
 
 const SORTS = ['scanned_at', 'rank', 'seen_count', 'confidence'] as const
 const ORDERS = ['asc', 'desc'] as const
@@ -26,6 +27,13 @@ const version = computed(() => typeof route.query.version === 'string' ? route.q
 const sort = computed<Sort>(() => (route.params.sort || 'scanned_at') as Sort)
 const order = computed<Order>(() => (route.params.order || 'desc') as Order)
 
+const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
+const searchTerm = computed(() => typeof route.query.q === 'string' ? route.query.q : '')
+const inputEl = ref<HTMLInputElement | null>(null)
+const router = useRouter()
+
+let inputDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
 useHead({
   title: () => {
     const opt = SORT_OPTIONS.find(o => o.key === sort.value)
@@ -33,10 +41,65 @@ useHead({
     const p = page.value > 1 ? ` — page ${page.value}` : ''
     return `Nuxt sites (${label})${p} — nuxt.fyi`
   },
+  meta: () => searchTerm.value ? [{ name: 'robots', content: 'noindex' }] : [],
 })
 
+// SSR (and the initial client `useFetch` run after hydration) always render the
+// unfiltered list. Keeping `q` out of the universal fetch means SSR and the first client
+// render produce identical markup, so hydration matches; it also keeps `/hits?q=…` from
+// being a crawlable, indexable surface or a cache-cardinality vector on the server.
 const { data, pending } = await useFetch<APIResponse<'/api/hits'>>('/api/hits', {
   query: computed(() => ({ page: page.value, version: version.value, sort: sort.value, order: order.value })),
+})
+
+type HitsData = APIResponse<'/api/hits'>
+
+// Filtered results are fetched separately, client-only, and override `data` when present.
+const filtered = ref<HitsData | null>(null)
+const searchPending = ref(false)
+let searchAbort: AbortController | null = null
+
+// Run after hydration so the initial client render matches SSR. Then keep `filtered` in
+// sync with `searchTerm` and the other query params, aborting any in-flight stale request.
+onMounted(() => {
+  watch([searchTerm, page, version, sort, order], async ([q, p, v, s, o]) => {
+    searchAbort?.abort()
+    if (!q) {
+      filtered.value = null
+      searchPending.value = false
+      return
+    }
+    searchAbort = new AbortController()
+    searchPending.value = true
+    try {
+      filtered.value = await $fetch<HitsData>('/api/hits', {
+        query: { page: p, version: v, sort: s, order: o, q },
+        signal: searchAbort.signal,
+      })
+    }
+    catch (err) {
+      if ((err as { name?: string }).name === 'AbortError') return
+      throw err
+    }
+    finally {
+      searchPending.value = false
+    }
+  }, { immediate: true })
+})
+
+const displayed = computed(() => filtered.value ?? data.value)
+
+watch(displayed, value => {
+  if (!value) return
+  if (page.value > 1 && value.hits.length === 0) {
+    const { page: _omit, ...rest } = route.query
+    router.replace({ name: 'hits-list', params: { sort: sort.value, order: order.value }, query: rest })
+  }
+})
+
+/** Keep the input in sync with the URL for back/forward and external navigations. */
+watch(searchTerm, value => {
+  if (value !== search.value) search.value = value
 })
 
 /** Sort pill: navigates to /hits/<sort>/<order>, dropping the page param since order changes. */
@@ -62,16 +125,64 @@ function detailPath(domain: string): RouteLocationRaw {
     query: { ...route.query, sort: sort.value, order: order.value },
   }
 }
+
+/** Deep-equal for the subset of LocationQuery we care about (flat string|null|undefined). */
+function queryEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const aKeys = Object.keys(a).filter(k => a[k] !== undefined)
+  const bKeys = Object.keys(b).filter(k => b[k] !== undefined)
+  if (aKeys.length !== bKeys.length) return false
+  for (const k of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false
+    if (String(a[k]) !== String(b[k])) return false
+  }
+  return true
+}
+
+function buildNextQuery(trimmed: string): Record<string, string> {
+  const next: Record<string, string> = {}
+  for (const [k, v] of Object.entries(route.query)) {
+    if (k === 'q' || k === 'page') continue
+    if (typeof v === 'string') next[k] = v
+  }
+  if (trimmed) next.q = trimmed
+  return next
+}
+
+function commit(rawTerm: string) {
+  const term = sanitizeSearchTerm(rawTerm)
+  const next = buildNextQuery(term)
+  if (queryEqual(next, route.query as Record<string, unknown>)) return
+  router.replace({ name: 'hits-list', params: { sort: sort.value, order: order.value }, query: next })
+}
+
+function scheduleUpdate() {
+  if (inputDebounceTimer) clearTimeout(inputDebounceTimer)
+  inputDebounceTimer = setTimeout(() => commit(search.value), 300)
+}
+
+function commitNow() {
+  if (inputDebounceTimer) { clearTimeout(inputDebounceTimer); inputDebounceTimer = null }
+  commit(search.value)
+}
+
+function clearSearch() {
+  if (inputDebounceTimer) { clearTimeout(inputDebounceTimer); inputDebounceTimer = null }
+  search.value = ''
+  commit('')
+  nextTick(() => inputEl.value?.focus())
+}
+
+onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
 </script>
 
 <template>
   <div>
     <h1>
       nuxt sites
-      <span v-if="data" class="muted small">({{ data.total }})</span>
+      <span v-if="displayed" class="muted small">({{ displayed.total }})</span>
     </h1>
 
-    <nav class="controls" aria-label="Sort sites">
+    <nav class="controls" aria-label="Sort and search sites">
       <span id="sort-label" class="control-label">sort:</span>
       <NuxtLink
         v-for="opt in SORT_OPTIONS"
@@ -80,12 +191,28 @@ function detailPath(domain: string): RouteLocationRaw {
         :class="['sort-link', { active: sort === opt.key }]"
         :aria-current="sort === opt.key ? 'true' : undefined"
       >{{ opt.label }}</NuxtLink>
+      <span class="search-control">
+        <label for="hits-search" class="control-label">search:</label>
+        <input
+          id="hits-search"
+          ref="inputEl"
+          v-model="search"
+          type="search"
+          placeholder="filter sites…"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Filter sites by domain or title"
+          @input="scheduleUpdate"
+          @keydown.enter.prevent="commitNow"
+        >
+        <span v-if="searchPending" class="search-pending muted small" role="status" aria-live="polite">searching…</span>
+      </span>
     </nav>
 
-    <div v-if="pending && !data" role="status" aria-live="polite" class="muted">loading…</div>
+    <div v-if="pending && !displayed" role="status" aria-live="polite" class="muted">loading…</div>
 
-    <ul v-if="data" class="grid" role="list">
-      <li v-for="(hit, index) in data.hits" :key="hit.domain">
+    <ul v-if="displayed && displayed.hits.length > 0" class="grid" role="list">
+      <li v-for="(hit, index) in displayed.hits" :key="hit.domain">
         <NuxtLink :to="detailPath(hit.domain)" class="hit">
           <div class="thumb">
             <HitImage
@@ -111,7 +238,17 @@ function detailPath(domain: string): RouteLocationRaw {
       </li>
     </ul>
 
-    <nav v-if="data && data.pageCount > 1" class="pagination" aria-label="Pagination">
+    <p v-else-if="displayed" class="muted empty" role="status">
+      no sites match this filter
+      <button
+        v-if="searchTerm"
+        type="button"
+        class="empty-clear"
+        @click="clearSearch"
+      >clear search</button>
+    </p>
+
+    <nav v-if="displayed && displayed.pageCount > 1" class="pagination" aria-label="Pagination">
       <NuxtLink
         v-if="page > 1"
         :to="pagePath(page - 1)"
@@ -120,10 +257,10 @@ function detailPath(domain: string): RouteLocationRaw {
       ><span aria-hidden="true">&larr; </span>prev<span class="sr-only"> page</span></NuxtLink>
       <span v-else class="page-link disabled" aria-hidden="true"><span aria-hidden="true">&larr; </span>prev</span>
       <span aria-live="polite" aria-atomic="true">
-        <span class="sr-only">page </span>{{ page }}<span class="sr-only"> of </span><span aria-hidden="true"> / </span>{{ data.pageCount }}
+        <span class="sr-only">page </span>{{ page }}<span class="sr-only"> of </span><span aria-hidden="true"> / </span>{{ displayed.pageCount }}
       </span>
       <NuxtLink
-        v-if="page < data.pageCount"
+        v-if="page < displayed.pageCount"
         :to="pagePath(page + 1)"
         class="page-link"
         rel="next"
@@ -134,7 +271,16 @@ function detailPath(domain: string): RouteLocationRaw {
 </template>
 
 <style scoped>
-.controls { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; align-items: baseline; }
+.controls { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; align-items: center; }
+.search-control { margin-left: auto; display: inline-flex; align-items: center; gap: 0.4rem; }
+.search-control input { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 3px; padding: 0.25rem 0.6rem; font: inherit; font-size: 0.85rem; min-width: 12rem; }
+.search-control input:focus-visible { border-color: var(--accent); outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.search-control input::-webkit-search-cancel-button { cursor: pointer; }
+.search-pending { font-style: italic; }
+.empty { margin: 2rem 0; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.empty-clear { background: transparent; border: 1px solid var(--border); color: var(--accent); padding: 0.2rem 0.6rem; font-family: inherit; font-size: 0.85rem; border-radius: 3px; cursor: pointer; }
+.empty-clear:hover { border-color: var(--accent); }
+.empty-clear:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .control-label { color: var(--muted); font-size: 0.85rem; }
 .sort-link { display: inline-block; background: transparent; border: 1px solid var(--border); color: var(--fg); padding: 0.25rem 0.75rem; font-family: inherit; font-size: 0.85rem; border-radius: 3px; text-decoration: none; }
 .sort-link:hover { border-color: var(--accent); }

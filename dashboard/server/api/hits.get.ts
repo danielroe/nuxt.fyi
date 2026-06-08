@@ -1,7 +1,8 @@
 import type { SQLInputValue } from 'node:sqlite'
-import { defineCachedHandler } from 'nitro/cache'
-import { getQuery } from 'nitro/h3'
+import { defineCachedFunction } from 'nitro/cache'
+import { defineHandler, getQuery } from 'nitro/h3'
 import type { HitsResponse, Signal } from '#shared/api'
+import { sanitizeSearchTerm } from '#shared/utils/search-term'
 import { getDb, type ScanRow } from '../utils/db'
 import { imageSourcesFor } from '../utils/image-url'
 
@@ -16,15 +17,20 @@ const SORTS: Record<string, string> = {
   rank: 'tranco_rank_value',
 }
 
-export default defineCachedHandler((event): HitsResponse => {
-  const db = getDb()
-  const query = getQuery(event)
-  const page = Math.max(1, Number(query.page) || 1)
-  const version = typeof query.version === 'string' ? query.version : null
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, m => `\\${m}`)
+}
 
-  const sortKey = typeof query.sort === 'string' && SORTS[query.sort] ? query.sort : 'scanned_at'
-  const orderRaw = typeof query.order === 'string' ? query.order.toLowerCase() : 'desc'
-  const order = orderRaw === 'asc' ? 'ASC' : 'DESC'
+interface HitsParams {
+  page: number
+  version: string | null
+  sortKey: string
+  order: 'ASC' | 'DESC'
+  q: string
+}
+
+function queryHits ({ page, version, sortKey, order, q }: HitsParams): HitsResponse {
+  const db = getDb()
   const sortCol = SORTS[sortKey]!
   // Rank 1 = most popular, so the natural order is ascending; unranked rows go last.
   const isRank = sortKey === 'rank'
@@ -42,6 +48,12 @@ export default defineCachedHandler((event): HitsResponse => {
       where += ` AND s.nuxt_version = ?`
       params.push(version)
     }
+  }
+
+  if (q) {
+    where += ` AND (LOWER(s.domain) LIKE ? ESCAPE '\\' OR LOWER(IFNULL(s.title, '')) LIKE ? ESCAPE '\\')`
+    const term = `%${escapeLike(q).toLowerCase()}%`
+    params.push(term, term)
   }
 
   const total = (db.prepare(`SELECT COUNT(*) AS c FROM scans s WHERE ${where}`).get(...params) as unknown as { c: number }).c
@@ -81,11 +93,26 @@ export default defineCachedHandler((event): HitsResponse => {
       rank: r.tranco_rank_value,
     })),
   }
-}, {
+}
+
+const queryHitsCached = defineCachedFunction(queryHits, {
   swr: true,
   maxAge: 1,
-  getKey: event => {
-    const query = getQuery(event)
-    return `hits:${query.page ?? 1}:${query.version ?? 'all'}:${query.sort ?? 'scanned_at'}:${query.order ?? 'desc'}`
-  }
+  getKey: ({ page, version, sortKey, order }) =>
+    `hits:${page}:${version ?? 'all'}:${sortKey}:${order.toLowerCase()}`,
+})
+
+export default defineHandler((event): HitsResponse | Promise<HitsResponse> => {
+  const query = getQuery(event)
+  const page = Math.max(1, Number(query.page) || 1)
+  const version = typeof query.version === 'string' ? query.version : null
+  const sortKey = typeof query.sort === 'string' && SORTS[query.sort] ? query.sort : 'scanned_at'
+  const orderRaw = typeof query.order === 'string' ? query.order.toLowerCase() : 'desc'
+  const order = orderRaw === 'asc' ? 'ASC' : 'DESC'
+  const q = sanitizeSearchTerm(query.q)
+
+  const params: HitsParams = { page, version, sortKey, order, q }
+  // Filtered queries skip the cache: `q` is a user-supplied free-form string, so caching
+  // it would let arbitrary requests mint unbounded cache entries.
+  return q ? queryHits(params) : queryHitsCached(params)
 })
