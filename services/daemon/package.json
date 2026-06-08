@@ -24,7 +24,7 @@
     "@atproto/api": "^0.20.6",
     "@imagekit/nodejs": "^7.6.2",
     "consola": "^3.4.0",
-    "tldts": "^6.1.0"
+    "tldts": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "24.12.4",
