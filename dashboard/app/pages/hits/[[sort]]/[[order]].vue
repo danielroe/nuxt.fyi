@@ -47,6 +47,14 @@ const { data, pending } = await useFetch<APIResponse<'/api/hits'>>('/api/hits', 
   query: computed(() => ({ page: page.value, version: version.value, sort: sort.value, order: order.value, q: searchTerm.value })),
 })
 
+watch(data, value => {
+  if (!value) return
+  if (page.value > 1 && value.hits.length === 0) {
+    const { page: _omit, ...rest } = route.query
+    router.replace({ name: 'hits-list', params: { sort: sort.value, order: order.value }, query: rest })
+  }
+})
+
 /** Sort pill: navigates to /hits/<sort>/<order>, dropping the page param since order changes. */
 function sortPath(opt: typeof SORT_OPTIONS[number]): RouteLocationRaw {
   const { page: _omit, ...rest } = route.query
