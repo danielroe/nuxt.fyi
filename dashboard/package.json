@@ -25,9 +25,9 @@
     "vue-router": "^5.0.7"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "fetchdts": "^0.1.7",
-    "typescript": "^6.0.3",
-    "vue-tsc": "^3.3.3"
+    "@types/node": "24.12.4",
+    "fetchdts": "0.1.7",
+    "typescript": "6.0.3",
+    "vue-tsc": "2.2.12"
   }
 }
