@@ -41,13 +41,55 @@ useHead({
     const p = page.value > 1 ? ` — page ${page.value}` : ''
     return `Nuxt sites (${label})${p} — nuxt.fyi`
   },
+  meta: () => searchTerm.value ? [{ name: 'robots', content: 'noindex' }] : [],
 })
 
+// SSR (and the initial client `useFetch` run after hydration) always render the
+// unfiltered list. Keeping `q` out of the universal fetch means SSR and the first client
+// render produce identical markup, so hydration matches; it also keeps `/hits?q=…` from
+// being a crawlable, indexable surface or a cache-cardinality vector on the server.
 const { data, pending } = await useFetch<APIResponse<'/api/hits'>>('/api/hits', {
-  query: computed(() => ({ page: page.value, version: version.value, sort: sort.value, order: order.value, q: searchTerm.value })),
+  query: computed(() => ({ page: page.value, version: version.value, sort: sort.value, order: order.value })),
 })
 
-watch(data, value => {
+type HitsData = APIResponse<'/api/hits'>
+
+// Filtered results are fetched separately, client-only, and override `data` when present.
+const filtered = ref<HitsData | null>(null)
+const searchPending = ref(false)
+let searchAbort: AbortController | null = null
+
+// Run after hydration so the initial client render matches SSR. Then keep `filtered` in
+// sync with `searchTerm` and the other query params, aborting any in-flight stale request.
+onMounted(() => {
+  watch([searchTerm, page, version, sort, order], async ([q, p, v, s, o]) => {
+    searchAbort?.abort()
+    if (!q) {
+      filtered.value = null
+      searchPending.value = false
+      return
+    }
+    searchAbort = new AbortController()
+    searchPending.value = true
+    try {
+      filtered.value = await $fetch<HitsData>('/api/hits', {
+        query: { page: p, version: v, sort: s, order: o, q },
+        signal: searchAbort.signal,
+      })
+    }
+    catch (err) {
+      if ((err as { name?: string }).name === 'AbortError') return
+      throw err
+    }
+    finally {
+      searchPending.value = false
+    }
+  }, { immediate: true })
+})
+
+const displayed = computed(() => filtered.value ?? data.value)
+
+watch(displayed, value => {
   if (!value) return
   if (page.value > 1 && value.hits.length === 0) {
     const { page: _omit, ...rest } = route.query
@@ -137,7 +179,7 @@ onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
   <div>
     <h1>
       nuxt sites
-      <span v-if="data" class="muted small">({{ data.total }})</span>
+      <span v-if="displayed" class="muted small">({{ displayed.total }})</span>
     </h1>
 
     <nav class="controls" aria-label="Sort and search sites">
@@ -163,13 +205,14 @@ onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
           @input="scheduleUpdate"
           @keydown.enter.prevent="commitNow"
         >
+        <span v-if="searchPending" class="search-pending muted small" role="status" aria-live="polite">searching…</span>
       </span>
     </nav>
 
-    <div v-if="pending && !data" role="status" aria-live="polite" class="muted">loading…</div>
+    <div v-if="pending && !displayed" role="status" aria-live="polite" class="muted">loading…</div>
 
-    <ul v-if="data && data.hits.length > 0" class="grid" role="list">
-      <li v-for="(hit, index) in data.hits" :key="hit.domain">
+    <ul v-if="displayed && displayed.hits.length > 0" class="grid" role="list">
+      <li v-for="(hit, index) in displayed.hits" :key="hit.domain">
         <NuxtLink :to="detailPath(hit.domain)" class="hit">
           <div class="thumb">
             <HitImage
@@ -195,7 +238,7 @@ onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
       </li>
     </ul>
 
-    <p v-else-if="data" class="muted empty" role="status">
+    <p v-else-if="displayed" class="muted empty" role="status">
       no sites match this filter
       <button
         v-if="searchTerm"
@@ -205,7 +248,7 @@ onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
       >clear search</button>
     </p>
 
-    <nav v-if="data && data.pageCount > 1" class="pagination" aria-label="Pagination">
+    <nav v-if="displayed && displayed.pageCount > 1" class="pagination" aria-label="Pagination">
       <NuxtLink
         v-if="page > 1"
         :to="pagePath(page - 1)"
@@ -214,10 +257,10 @@ onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
       ><span aria-hidden="true">&larr; </span>prev<span class="sr-only"> page</span></NuxtLink>
       <span v-else class="page-link disabled" aria-hidden="true"><span aria-hidden="true">&larr; </span>prev</span>
       <span aria-live="polite" aria-atomic="true">
-        <span class="sr-only">page </span>{{ page }}<span class="sr-only"> of </span><span aria-hidden="true"> / </span>{{ data.pageCount }}
+        <span class="sr-only">page </span>{{ page }}<span class="sr-only"> of </span><span aria-hidden="true"> / </span>{{ displayed.pageCount }}
       </span>
       <NuxtLink
-        v-if="page < data.pageCount"
+        v-if="page < displayed.pageCount"
         :to="pagePath(page + 1)"
         class="page-link"
         rel="next"
@@ -233,6 +276,7 @@ onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
 .search-control input { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 3px; padding: 0.25rem 0.6rem; font: inherit; font-size: 0.85rem; min-width: 12rem; }
 .search-control input:focus-visible { border-color: var(--accent); outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .search-control input::-webkit-search-cancel-button { cursor: pointer; }
+.search-pending { font-style: italic; }
 .empty { margin: 2rem 0; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .empty-clear { background: transparent; border: 1px solid var(--border); color: var(--accent); padding: 0.2rem 0.6rem; font-family: inherit; font-size: 0.85rem; border-radius: 3px; cursor: pointer; }
 .empty-clear:hover { border-color: var(--accent); }
