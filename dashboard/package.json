@@ -28,6 +28,6 @@
     "@types/node": "24.12.4",
     "fetchdts": "0.1.7",
     "typescript": "6.0.3",
-    "vue-tsc": "2.2.12"
+    "vue-tsc": "3.3.5"
   }
 }
