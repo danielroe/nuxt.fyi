@@ -102,12 +102,12 @@ packages:
       commander:
         optional: true
 
-  '@clack/core@1.4.0':
-    resolution: {integrity: sha512-7Wctjq6f7c1CPz8sPpkwUnz8yRgVANkpNupb81q432FjcJg4l+Sw7XANdNSdWfAKq0IHI0JTcUeK5dxs/HrGPw==}
+  '@clack/core@1.4.1':
+    resolution: {integrity: sha512-FILJa1gGKEFTGZAJE9RpVhrjKz3c3h4ar60dSv6cGuDqufQ84YEIS3GAGvZiN+H6yaLbbvTFNejjCC4tXpZEuw==}
     engines: {node: '>= 20.12.0'}
 
-  '@clack/prompts@1.5.0':
-    resolution: {integrity: sha512-wKh+wTjmrUoUdkZg8KpJO5X+p9PWV+KE9mePseq9UYWkukgTKsGS47RRL2HstwVcvDQH+PenrPJWII8+MfiiyA==}
+  '@clack/prompts@1.5.1':
+    resolution: {integrity: sha512-zccHj2z2oCCO4yrDiRSlFOxWerGqRiysP7a5jPK6uoI9URKAquwY42Dd/iUP8JWHxEzdRe4TlbvZCo8z1/mhrw==}
     engines: {node: '>= 20.12.0'}
 
   '@devframes/hub@0.5.2':
@@ -322,8 +322,8 @@ packages:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
 
-  '@nuxt/cli-nightly@3.36.0-20260604-135656-f869c61':
-    resolution: {integrity: sha512-MrxPN9/eLN/c01+FkPU0ejQdKMFFSSG+OUC0p5NfRQyVSK0o8JSuSxidVrsYUB9OQJUz71n+I1zId8rgfiEPNw==}
+  '@nuxt/cli-nightly@3.36.0-20260610-205309-fab0173':
+    resolution: {integrity: sha512-xkqQ4kZz9tNRRO5wIDBRqqiLMM3nbb09rgwC1OqQxG3LbXcFz/zhFtIuc9z7BjDWyQNI57qJGfwil/ZZhHJljA==}
     engines: {node: ^16.14.0 || >=18.0.0}
     hasBin: true
     peerDependencies:
@@ -1949,8 +1949,8 @@ packages:
   scule@1.3.0:
     resolution: {integrity: sha512-6FtHJEvt+pVMIB9IBY+IcCJ6Z5f1iQnytgyfKMhDKgmzYG+TeH/wx1y3l27rshSbLiSanrR9ffZDrEsmjlQF2g==}
 
-  semver@7.8.1:
-    resolution: {integrity: sha512-rkVq3IXh+4FDGch+KwzX3aV9W3kO54GyEgpvBzSyctDA6Xtd7RJQV1xmXbeQp5v7+VzLOfVqiutSE6GICgPFvg==}
+  semver@7.8.4:
+    resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -2496,14 +2496,14 @@ snapshots:
     optionalDependencies:
       citty: 0.2.2
 
-  '@clack/core@1.4.0':
+  '@clack/core@1.4.1':
     dependencies:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
-  '@clack/prompts@1.5.0':
+  '@clack/prompts@1.5.1':
     dependencies:
-      '@clack/core': 1.4.0
+      '@clack/core': 1.4.1
       fast-string-width: 3.0.2
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
@@ -2684,10 +2684,10 @@ snapshots:
       '@tybys/wasm-util': 0.10.2
     optional: true
 
-  '@nuxt/cli-nightly@3.36.0-20260604-135656-f869c61(@nuxt/schema-nightly@5.0.0-29671099.144c0d1b)(magicast@0.5.3)':
+  '@nuxt/cli-nightly@3.36.0-20260610-205309-fab0173(@nuxt/schema-nightly@5.0.0-29671099.144c0d1b)(magicast@0.5.3)':
     dependencies:
       '@bomb.sh/tab': 0.0.15(citty@0.2.2)
-      '@clack/prompts': 1.5.0
+      '@clack/prompts': 1.5.1
       c12: 3.3.4(magicast@0.5.3)
       citty: 0.2.2
       confbox: 0.2.4
@@ -2707,7 +2707,7 @@ snapshots:
       perfect-debounce: 2.1.0
       pkg-types: 2.3.1
       scule: 1.3.0
-      semver: 7.8.1
+      semver: 7.8.4
       srvx: 0.11.16
       std-env: 4.1.0
       tinyclip: 0.1.14
@@ -2753,7 +2753,7 @@ snapshots:
       pathe: 2.0.3
       perfect-debounce: 2.1.0
       pkg-types: 2.3.1
-      semver: 7.8.1
+      semver: 7.8.4
       sirv: 3.0.2
       structured-clone-es: 2.0.0
       tinyexec: 1.2.4
@@ -2846,7 +2846,7 @@ snapshots:
       pkg-types: 2.3.1
       rc9: 3.0.1
       scule: 1.3.0
-      semver: 7.8.1
+      semver: 7.8.4
       std-env: 4.1.0
       tinyglobby: 0.2.17
       ufo: 1.6.4
@@ -2872,7 +2872,7 @@ snapshots:
       pkg-types: 2.3.1
       rc9: 3.0.1
       scule: 1.3.0
-      semver: 7.8.1
+      semver: 7.8.4
       tinyglobby: 0.2.17
       ufo: 1.6.4
       unctx: 2.5.0
@@ -4252,7 +4252,7 @@ snapshots:
   nuxt-nightly@5.0.0-29671099.144c0d1b(@parcel/watcher@2.5.6)(@types/node@24.12.4)(@vue/compiler-sfc@3.5.35)(crossws@0.4.5(srvx@0.11.16))(db0@0.3.4)(dotenv@17.4.2)(giget@3.2.0)(lightningcss@1.32.0)(magicast@0.5.3)(nuxt-nightly@5.0.0-29671099.144c0d1b)(oxc-parser@0.134.0)(typescript@6.0.3)(vite@8.0.16(@types/node@24.12.4)(jiti@2.7.0)(yaml@2.9.0))(vue-tsc@2.2.12(typescript@6.0.3))(yaml@2.9.0):
     dependencies:
       '@dxup/nuxt': 0.4.1(magicast@0.5.3)(typescript@6.0.3)
-      '@nuxt/cli': '@nuxt/cli-nightly@3.36.0-20260604-135656-f869c61(@nuxt/schema-nightly@5.0.0-29671099.144c0d1b)(magicast@0.5.3)'
+      '@nuxt/cli': '@nuxt/cli-nightly@3.36.0-20260610-205309-fab0173(@nuxt/schema-nightly@5.0.0-29671099.144c0d1b)(magicast@0.5.3)'
       '@nuxt/devtools': 4.0.0-alpha.7(crossws@0.4.5(srvx@0.11.16))(db0@0.3.4)(typescript@6.0.3)(vite@8.0.16(@types/node@24.12.4)(jiti@2.7.0)(yaml@2.9.0))(vue@3.5.35(typescript@6.0.3))
       '@nuxt/kit': '@nuxt/kit-nightly@5.0.0-29671099.144c0d1b(magicast@0.5.3)'
       '@nuxt/nitro-server': '@nuxt/nitro-server-nightly@5.0.0-29671099.144c0d1b(chokidar@5.0.0)(crossws@0.4.5(srvx@0.11.16))(db0@0.3.4)(dotenv@17.4.2)(giget@3.2.0)(jiti@2.7.0)(lightningcss@1.32.0)(magicast@0.5.3)(nuxt-nightly@5.0.0-29671099.144c0d1b)(ofetch@2.0.0-alpha.3)(rolldown@1.1.0)(typescript@6.0.3)(vite@8.0.16(@types/node@24.12.4)(jiti@2.7.0)(yaml@2.9.0))'
@@ -4290,7 +4290,7 @@ snapshots:
       rolldown: 1.1.0
       rolldown-string: 0.3.0(rolldown@1.1.0)
       scule: 1.3.0
-      semver: 7.8.1
+      semver: 7.8.4
       std-env: 4.1.0
       tinyglobby: 0.2.17
       ufo: 1.6.4
@@ -4614,7 +4614,7 @@ snapshots:
 
   scule@1.3.0: {}
 
-  semver@7.8.1: {}
+  semver@7.8.4: {}
 
   seroval@1.5.4: {}
 
@@ -4622,7 +4622,7 @@ snapshots:
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
-      semver: 7.8.1
+      semver: 7.8.4
     optionalDependencies:
       '@img/sharp-darwin-arm64': 0.34.5
       '@img/sharp-darwin-x64': 0.34.5
