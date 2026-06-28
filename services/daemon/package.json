@@ -27,7 +27,7 @@
     "tldts": "^7.0.0"
   },
   "devDependencies": {
-    "@types/node": "24.12.4",
+    "@types/node": "24.13.2",
     "typescript": "6.0.3"
   }
 }
