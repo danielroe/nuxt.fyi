@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@11.3.0",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "start": "pnpm --filter @nuxt-fyi/daemon start",
     "dev": "pnpm --filter @nuxt-fyi/daemon dev",
