@@ -45,6 +45,22 @@ pnpm dev:dashboard
 
 Set `VERBOSE=1` to log every post the daemon sees.
 
+### Dashboard against production data
+
+To work on the dashboard UI without running the daemon, scanner, or a local database,
+point it at production:
+
+```bash
+# proxies every /api/** request to https://nuxt.fyi
+pnpm dev:dashboard:prod
+
+# or serve static dummy data for fully offline UI work
+pnpm dev:dashboard:fixtures
+```
+
+Override the proxy target with `NUXT_UI_ONLY_TARGET`. Submissions in this mode hit the
+live submit endpoint, so a queued domain is a real scan request.
+
 ## Manual submissions
 
 The dashboard's home page has a small form for queueing a domain by hand. Under the

@@ -6,7 +6,9 @@ definePageMeta({ name: 'index' })
 
 useHead({ title: 'Overview — nuxt.fyi' })
 
-const { data } = await useFetch<APIResponse<'/api/stats'>>('/api/stats')
+const { data, pending } = await useFetch<APIResponse<'/api/stats'>>('/api/stats', {
+  lazy: true,
+})
 
 const unverifiedCount = computed(() =>
   (data.value?.versions ?? [])
@@ -16,7 +18,17 @@ const unverifiedCount = computed(() =>
 </script>
 
 <template>
-  <div v-if="data">
+  <div v-if="pending && !data" aria-hidden="true">
+    <h1>overview</h1>
+    <div class="grid">
+      <div v-for="n in 4" :key="n" class="card">
+        <div class="big"><SkeletonBlock class="skeleton-text" width="4rem" /></div>
+        <div class="label"><SkeletonBlock class="skeleton-text" width="8rem" /></div>
+      </div>
+    </div>
+    <p class="sr-only" role="status" aria-live="polite">loading overview…</p>
+  </div>
+  <div v-else-if="data">
     <h1>overview</h1>
 
     <div class="grid">
@@ -84,6 +96,9 @@ function barWidth(value: number, max: number): string {
 <style scoped>
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 .card { padding: 1rem; border: 1px solid var(--border); border-radius: 4px; }
+/* Skeleton bars sit inside the real `.big`/`.label` wrappers, so a card keeps its exact
+   height (`1lh` per line + the label's margin) and the swap causes no shift. */
+.skeleton-text { height: 1lh; }
 .big { font-size: 1.8rem; color: var(--accent); }
 .label { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
 .small { font-size: 0.85rem; }

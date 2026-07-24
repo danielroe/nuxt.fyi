@@ -6,9 +6,13 @@ import { fmtNumber } from '~/composables/format'
 definePageMeta({ name: 'hits-detail' })
 
 const route = useRoute('hits-detail')
-const domain = computed(() => route.params.domain)
+const domain = computed(() => route.params.domain as string)
 
-const { data, error } = await useFetch<APIResponse<`/api/hits/${string}`>>(() => `/api/hits/${encodeURIComponent(domain.value)}`)
+const { data, error, pending } = await useFetch<APIResponse<`/api/hits/${string}`>>(() => `/api/hits/${encodeURIComponent(domain.value)}`, {
+  lazy: true,
+})
+
+const showSkeleton = computed(() => pending.value && !data.value && !error.value)
 
 useHead({
   title: () => {
@@ -46,7 +50,18 @@ const backTo = computed<RouteLocationRaw>(() => {
   <div>
     <NuxtLink :to="backTo" class="back"><span aria-hidden="true">&larr; </span>all sites</NuxtLink>
 
-    <div v-if="error" role="alert" class="muted">not found</div>
+    <div v-if="showSkeleton" aria-hidden="true">
+      <h1>
+        <SkeletonBlock class="skeleton-text" width="14rem" />
+        <span class="tag"><SkeletonBlock class="skeleton-text skeleton-inline" width="3rem" /></span>
+      </h1>
+      <p class="muted"><SkeletonBlock class="skeleton-text" width="18rem" /></p>
+      <p><SkeletonBlock class="skeleton-text" width="22rem" /></p>
+      <div class="screenshot screenshot-skeleton"><SkeletonBlock height="100%" radius="0" /></div>
+      <p class="sr-only" role="status" aria-live="polite">loading site…</p>
+    </div>
+
+    <div v-else-if="error" role="alert" class="muted">not found</div>
 
     <div v-else-if="data">
       <h1>
@@ -113,6 +128,12 @@ const backTo = computed<RouteLocationRaw>(() => {
 h1 { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .rank { color: #b9d; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.85rem; }
 .screenshot { border: 1px solid var(--border); margin: 1rem 0; overflow: hidden; }
+.screenshot-skeleton { aspect-ratio: 1280/800; }
+/* One-line-box bars keep each skeleton row the exact height of its real counterpart, and
+   the screenshot placeholder shares the real image's aspect ratio, so nothing shifts when
+   the data lands. */
+.skeleton-text { height: 1lh; }
+.skeleton-inline { display: inline-block; vertical-align: middle; }
 .screenshot img { width: 100%; height: auto; display: block; }
 .signals { list-style: none; padding: 0; }
 .signals li { padding: 0.4rem 0; border-bottom: 1px solid var(--border); display: flex; gap: 1rem; align-items: baseline; }

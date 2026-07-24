@@ -50,6 +50,7 @@ useHead({
 // being a crawlable, indexable surface or a cache-cardinality vector on the server.
 const { data, pending } = await useFetch<APIResponse<'/api/hits'>>('/api/hits', {
   query: computed(() => ({ page: page.value, version: version.value, sort: sort.value, order: order.value })),
+  lazy: true,
 })
 
 type HitsData = APIResponse<'/api/hits'>
@@ -88,6 +89,14 @@ onMounted(() => {
 })
 
 const displayed = computed(() => filtered.value ?? data.value)
+
+// Show a skeleton grid while a page/sort/version navigation is fetching, and on the very
+// first load before any data has arrived. Search typing keeps the current results visible
+// (with the inline "searching…" hint) rather than flashing skeletons on every keystroke.
+const showSkeleton = computed(() => (pending.value && !searchTerm.value) || !displayed.value)
+// Match the number of cards currently on screen so the grid keeps its height across the
+// swap; fall back to a full page's worth on the very first load.
+const skeletonCount = computed(() => displayed.value?.hits.length || displayed.value?.pageSize || 12)
 
 watch(displayed, value => {
   if (!value) return
@@ -209,9 +218,26 @@ onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
       </span>
     </nav>
 
-    <div v-if="pending && !displayed" role="status" aria-live="polite" class="muted">loading…</div>
+    <ul v-if="showSkeleton" class="grid" role="list" aria-hidden="true">
+      <li v-for="n in skeletonCount" :key="n">
+        <div class="hit">
+          <div class="thumb">
+            <SkeletonBlock height="100%" radius="0" />
+          </div>
+          <div class="meta">
+            <div class="domain"><SkeletonBlock class="skeleton-text" width="55%" /></div>
+            <div class="title"><SkeletonBlock class="skeleton-text" width="85%" /></div>
+            <div class="tags">
+              <span class="tag"><SkeletonBlock class="skeleton-text" width="2.5rem" /></span>
+              <span class="muted"><SkeletonBlock class="skeleton-text" width="3.5rem" /></span>
+            </div>
+          </div>
+        </div>
+      </li>
+    </ul>
+    <p v-if="showSkeleton" class="sr-only" role="status" aria-live="polite">loading sites…</p>
 
-    <ul v-if="displayed && displayed.hits.length > 0" class="grid" role="list">
+    <ul v-else-if="displayed && displayed.hits.length > 0" class="grid" role="list">
       <li v-for="(hit, index) in displayed.hits" :key="hit.domain">
         <NuxtLink :to="detailPath(hit.domain)" class="hit">
           <div class="thumb">
@@ -298,6 +324,10 @@ onUnmounted(() => { if (inputDebounceTimer) clearTimeout(inputDebounceTimer) })
 .tags { display: flex; gap: 0.5rem; font-size: 0.8rem; flex-wrap: wrap; align-items: baseline; }
 .tags .muted { color: var(--muted); }
 .rank { color: #b9d; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+/* Size skeleton bars to exactly one line box (`1lh`) so a `.domain`/`.title`/tag row keeps
+   the identical height it has with real text: swapping skeleton -> content causes no shift. */
+.skeleton-text { height: 1lh; }
+.tags .tag .skeleton-text, .tags .muted .skeleton-text { display: inline-block; vertical-align: middle; }
 .pagination { margin-top: 2rem; display: flex; align-items: center; gap: 1rem; justify-content: center; }
 .page-link { display: inline-block; background: transparent; border: 1px solid var(--border); color: var(--fg); padding: 0.25rem 0.75rem; font-family: inherit; text-decoration: none; }
 .page-link:hover { border-color: var(--accent); }

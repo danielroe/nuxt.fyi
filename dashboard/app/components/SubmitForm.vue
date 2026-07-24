@@ -7,10 +7,17 @@ const submitting = ref(false)
 const result = ref<SubmitResult | null>(null)
 const errorMessage = ref<string | null>(null)
 
+/** Accept a bare domain (`example.com`) as well as a full URL. */
+function normalizeInput(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+}
+
 async function onSubmit(): Promise<void> {
-  const trimmed = url.value.trim()
-  if (!trimmed) {
-    errorMessage.value = 'enter a url first'
+  const normalized = normalizeInput(url.value)
+  if (!normalized) {
+    errorMessage.value = 'enter a domain or url first'
     return
   }
   submitting.value = true
@@ -19,7 +26,7 @@ async function onSubmit(): Promise<void> {
   try {
     result.value = await $apiFetch('/api/submit', {
       method: 'POST',
-      body: { url: trimmed },
+      body: { url: normalized },
     })
     url.value = ''
   }
@@ -60,14 +67,15 @@ const STATUS_COPY: Record<NonNullable<SubmitResult['status']>, string> = {
     </div>
 
     <form class="submit-form" @submit.prevent="onSubmit">
-      <label for="submit-url" class="sr-only">URL to scan</label>
+      <label for="submit-url" class="sr-only">Domain or URL to scan</label>
       <input
         id="submit-url"
         v-model="url"
-        type="url"
+        type="text"
         inputmode="url"
-        placeholder="https://example.com"
+        placeholder="example.com"
         autocomplete="off"
+        autocapitalize="off"
         spellcheck="false"
         :disabled="submitting"
         required

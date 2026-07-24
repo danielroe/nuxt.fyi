@@ -10,11 +10,10 @@ allowBuilds:
   sharp: true
 minimumReleaseAgeExclude:
   - '@atproto/api@0.20.6'
-  - '@nuxt/kit-nightly@5.0.0-29671099.144c0d1b'
-  - '@nuxt/nitro-server-nightly@5.0.0-29671099.144c0d1b'
-  - '@nuxt/schema-nightly@5.0.0-29671099.144c0d1b'
-  - '@nuxt/vite-builder-nightly@5.0.0-29671099.144c0d1b'
-  - nuxt-nightly@5.0.0-29671099.144c0d1b
+  - '@nuxt/kit-nightly@5.0.0-29748311.884bca56'
+  - '@nuxt/nitro-server-nightly@5.0.0-29748311.884bca56'
+  - '@nuxt/schema-nightly@5.0.0-29748311.884bca56'
+  - '@nuxt/vite-builder-nightly@5.0.0-29748311.884bca56'
+  - nuxt-nightly@5.0.0-29748311.884bca56
 patchedDependencies:
-  nitro@3.0.260522-beta: patches/nitro@3.0.260522-beta.patch
-  nuxt-nightly@5.0.0-29671099.144c0d1b: patches/nuxt-nightly@5.0.0-29671099.144c0d1b.patch
+  nitro@3.0.260610-beta: patches/nitro@3.0.260610-beta.patch

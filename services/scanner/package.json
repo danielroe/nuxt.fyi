@@ -18,7 +18,7 @@
     "@imagekit/nodejs": "^7.6.2",
     "@tensorflow/tfjs-node": "^4.22.0",
     "consola": "^3.4.0",
-    "nitro": "^3.0.260522-beta",
+    "nitro": "^3.0.260610-beta",
     "nsfwjs": "^4.3.0",
     "playwright": "^1.49.0"
   },

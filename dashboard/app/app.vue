@@ -45,7 +45,7 @@ router.afterEach((to, from) => {
       </a>
     </header>
     <main id="main" ref="mainRef" tabindex="-1">
-      <NuxtPage />
+      <NuxtPage :page-key="route => String(route.name ?? route.path)" />
     </main>
     <footer>
       <span class="tagline">watches the bluesky firehose for sites built in nuxt.</span>
@@ -118,5 +118,11 @@ h2 { font-size: 1.1rem; margin: 2rem 0 0.75rem; color: var(--fg); }
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 2px;
+}
+
+.page-enter-active, .page-leave-active { transition: opacity 0.15s ease; }
+.page-enter-from, .page-leave-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active, .page-leave-active { transition: none; }
 }
 </style>

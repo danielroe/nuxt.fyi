@@ -51,7 +51,13 @@ const { data, pending } = await useFetch<APIResponse<'/api/recent'>>('/api/recen
     filter: activeFilter.value.value,
     limit: 100,
   })),
+  lazy: true,
 })
+
+const showSkeleton = computed(() => pending.value || !data.value)
+// Match the current row count so the table keeps its height across the swap; fall back to
+// a sensible default on the very first load.
+const skeletonRows = computed(() => data.value?.rows.length || 20)
 
 useHead({
   title: () => {
@@ -109,9 +115,7 @@ function ariaSortValue(key: Sort): 'ascending' | 'descending' | 'none' {
       >{{ opt.label }}</NuxtLink>
     </nav>
 
-    <div v-if="pending && !data" role="status" aria-live="polite" class="muted">loading…</div>
-
-    <div v-if="data" class="rows-scroll">
+    <div class="rows-scroll">
     <table class="rows">
       <caption class="sr-only">Recent domains observed on Bluesky, filtered by {{ activeFilter.label }}</caption>
       <thead>
@@ -131,7 +135,16 @@ function ariaSortValue(key: Sort): 'ascending' | 'descending' | 'none' {
           </th>
         </tr>
       </thead>
-      <tbody>
+      <tbody v-if="showSkeleton" aria-hidden="true">
+        <tr v-for="n in skeletonRows" :key="n">
+          <td class="domain"><SkeletonBlock class="skeleton-text" width="70%" /></td>
+          <td class="status"><SkeletonBlock class="skeleton-text" width="4rem" /></td>
+          <td class="num"><SkeletonBlock class="skeleton-text skeleton-num" width="2rem" /></td>
+          <td class="num"><SkeletonBlock class="skeleton-text skeleton-num" width="3.5rem" /></td>
+          <td class="num"><SkeletonBlock class="skeleton-text skeleton-num" width="3.5rem" /></td>
+        </tr>
+      </tbody>
+      <tbody v-else-if="data">
         <tr v-for="row in data.rows" :key="row.domain" :class="{ nuxt: row.isNuxt }">
           <td class="domain">
             <NuxtLink v-if="row.isNuxt" :to="detailPath(row.domain)">
@@ -156,8 +169,9 @@ function ariaSortValue(key: Sort): 'ascending' | 'descending' | 'none' {
       </tbody>
     </table>
     </div>
+    <p v-if="showSkeleton" class="sr-only" role="status" aria-live="polite">loading domains…</p>
 
-    <p v-if="data && data.rows.length === 0" role="status" class="muted">no rows match this filter</p>
+    <p v-if="!showSkeleton && data && data.rows.length === 0" role="status" class="muted">no rows match this filter</p>
   </div>
 </template>
 
@@ -192,4 +206,9 @@ function ariaSortValue(key: Sort): 'ascending' | 'descending' | 'none' {
 .error { color: #b85; }
 .small { font-size: 0.85rem; }
 .sort-indicator { display: inline-block; width: 0.6em; color: var(--accent); }
+/* Size skeleton bars to one line box so a skeleton row is the exact height of a data row
+   (`td` padding + one line of text): the swap causes no vertical shift. Right-align the
+   number columns to sit where their real values do. */
+.skeleton-text { height: 1lh; }
+.rows td.num .skeleton-num { margin-left: auto; }
 </style>

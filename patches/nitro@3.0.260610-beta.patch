@@ -1,0 +1,41 @@
+diff --git a/dist/_build/common.mjs b/dist/_build/common.mjs
+index 76694ff062bae1ef5f6d548ae80b53dcfd8362ef..9606ff0ea280536d3e52c941b92d5ea577e21518 100644
+--- a/dist/_build/common.mjs
++++ b/dist/_build/common.mjs
+@@ -20789,6 +20789,7 @@
+ 			const from = i.typeFrom || i.from;
+ 			if (resolvedImportPathMap.has(from)) continue;
+ 			let path = resolveAlias(from, nitro.options.alias);
++			let usePackageSubpath = false;
+ 			if (!isAbsolute$2(path)) {
+ 				const resolvedPath = resolveModulePath(from, {
+ 					try: true,
+@@ -20813,11 +20814,26 @@
+ 					if (!dir || !name) path = resolvedPath;
+ 					else {
+ 						const subpath = await lookupNodeModuleSubpath(resolvedPath);
+-						path = subpath && subpath !== "./" ? join$2(dir, name, subpath) : resolvedPath;
++						if (subpath && subpath !== "./") {
++							path = join$2(dir, name, subpath);
++							// A package subpath (e.g. `nitro/h3`) maps to a file via the package's
++							// `exports` field; the joined path doesn't exist on disk. Writing it as
++							// a relative path leaves TS unable to resolve `typeof import('relative/.../nitro/h3')`,
++							// so emit the bare specifier and let TS's package resolution honour `exports`.
++							usePackageSubpath = true;
++						} else {
++							path = resolvedPath;
++						}
+ 					}
+ 				}
+ 			}
+-			if (existsSync(path) && !await isDirectory(path)) path = path.replace(/\.[a-z]+$/, "");
++			if (usePackageSubpath) {
++				path = from;
++			} else {
++				// Only strip extensions TS retries on its own. `.d.mts`/`.d.cts` aren't
++				// in that retry list, so leave them on.
++				if (existsSync(path) && !await isDirectory(path)) path = path.replace(/\.(?:tsx?|jsx?|[cm]js)$/, "");
++			}
+ 			if (isAbsolute$2(path)) path = relative$2(generatedTypesDir, path);
+ 			resolvedImportPathMap.set(from, path);
+ 		}
