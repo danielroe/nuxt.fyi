@@ -28,6 +28,7 @@ test('builds short post with version', () => {
   })
   assert.ok(text.includes('Nuxt: The Full-Stack Vue Framework'))
   assert.ok(text.includes('Nuxt v4.4.6 detected on nuxt.com'))
+  // lgtm[js/incomplete-url-substring-sanitization] - test assertion, not URL validation
   assert.ok(text.includes('https://nuxt.com/'))
   assert.ok(text.length <= 300)
 })
@@ -50,6 +51,7 @@ test('falls back to https://<domain> when no finalUrl', () => {
     title: null,
     detection: { nuxtVersion: null },
   })
+  // lgtm[js/incomplete-url-substring-sanitization] - test assertion, not URL validation
   assert.ok(text.endsWith('https://example.com'))
 })
 
@@ -64,6 +66,7 @@ test('truncates long titles to stay within 300 chars', () => {
   assert.ok(text.length <= 300)
   assert.ok(text.includes('\u2026'), 'should add ellipsis when trimming')
   assert.ok(text.includes('Nuxt v4.0.0 detected'))
+  // lgtm[js/incomplete-url-substring-sanitization] - test assertion, not URL validation
   assert.ok(text.includes('https://example.com/path'))
 })
 
