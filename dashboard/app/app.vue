@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import type { RouteLocationRaw } from 'vue-router'
+import type { RouteLocationNormalizedLoadedGeneric, RouteLocationRaw } from 'vue-router'
+
+const pageKey = (route: RouteLocationNormalizedLoadedGeneric) => String(route.name ?? route.path)
 
 const home: RouteLocationRaw = { name: 'index' }
 const hitsList: RouteLocationRaw = { name: 'hits-list', params: {} }
@@ -45,7 +47,7 @@ router.afterEach((to, from) => {
       </a>
     </header>
     <main id="main" ref="mainRef" tabindex="-1">
-      <NuxtPage :page-key="route => String(route.name ?? route.path)" />
+      <NuxtPage :page-key="pageKey" />
     </main>
     <footer>
       <span class="tagline">watches the bluesky firehose for sites built in nuxt.</span>
