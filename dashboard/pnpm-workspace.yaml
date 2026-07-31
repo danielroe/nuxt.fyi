@@ -1,3 +1,7 @@
+allowBuilds:
+  '@parcel/watcher': false
+  sharp: false
+
 minimumReleaseAgeExclude:
   - '@nuxt/kit-nightly@5.0.0-29748311.884bca56'
   - '@nuxt/nitro-server-nightly@5.0.0-29748311.884bca56'
