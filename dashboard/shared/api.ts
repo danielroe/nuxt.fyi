@@ -3,7 +3,7 @@
  */
 
 import type { DynamicParam, Endpoint, TypedFetchInput, TypedFetchRequestInit, TypedFetchResponseBody } from 'fetchdts'
-import type { $Fetch } from 'nitro/types'
+import { $fetch } from 'ofetch'
 
 export type VersionBucket = 'published' | 'off-registry' | 'unknown'
 export type NsfwLabel = 'safe' | 'suggestive' | 'nsfw'
@@ -145,4 +145,4 @@ export const $apiFetch = <T extends TypedFetchInput<APISchema>>(
   input: T,
   init?: TypedFetchRequestInit<APISchema, T>,
 ): Promise<TypedFetchResponseBody<APISchema, T>> =>
-  (globalThis as unknown as { $fetch: $Fetch }).$fetch(input as string, init as object) as Promise<TypedFetchResponseBody<APISchema, T>>
+  $fetch(input as string, init as object) as Promise<TypedFetchResponseBody<APISchema, T>>
