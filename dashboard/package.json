@@ -2,7 +2,7 @@
   "name": "nuxt-fyi-dashboard",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.17.0",
+  "packageManager": "pnpm@11.20.0",
   "engines": {
     "node": ">=24"
   },
@@ -20,7 +20,7 @@
     "defu": "^6.1.7",
     "h3": "2.0.1-rc.26",
     "nitro": "3.0.260610-beta",
-    "nuxt": "npm:nuxt-nightly@5.0.0-29751019.6799c03e",
+    "nuxt": "npm:nuxt-nightly@5.0.0-29763987.a48dcbf9",
     "ofetch": "2.0.0-alpha.3",
     "vue": "^3.5.0",
     "vue-router": "^5.0.7"
@@ -29,6 +29,6 @@
     "@types/node": "24.13.3",
     "fetchdts": "0.1.7",
     "typescript": "6.0.3",
-    "vue-tsc": "3.3.8"
+    "vue-tsc": "3.3.9"
   }
 }
