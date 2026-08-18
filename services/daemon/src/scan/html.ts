@@ -1,5 +1,6 @@
 import { detectFromHtml, type DetectionResult } from './detect.ts'
 import { detectBlock, type BlockSignal } from './block.ts'
+import { detectHosting, type HostingResult } from './hosting.ts'
 
 export interface HtmlScanResult {
   detection: DetectionResult
@@ -12,6 +13,8 @@ export interface HtmlScanResult {
   status: number
   /** Bot-mitigation signal detected in the response, or null for a clean page. */
   blockSignal: BlockSignal | null
+  /** Hosting platform + fronting CDN detected from response headers. */
+  hosting: HostingResult
   html: string
 }
 
@@ -103,6 +106,7 @@ export async function scanHtml(url: string): Promise<HtmlScanResult> {
       ogImage,
       status: res.status,
       blockSignal: detectBlock(res.status, res.headers, html),
+      hosting: detectHosting(res.headers),
       html,
     }
   } finally {

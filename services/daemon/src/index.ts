@@ -155,6 +155,8 @@ async function handleDetection({ domain }: DetectionJob): Promise<void> {
       outcome: outcome.outcome,
       blockSignal: outcome.blockSignal,
       httpStatus: outcome.httpStatus,
+      hostingPlatform: outcome.hostingPlatform,
+      hostingCdn: outcome.hostingCdn,
     })
 
     if (outcome.redirectedTo && outcome.redirectedTo !== domain) {
@@ -231,6 +233,8 @@ async function handleCapture(job: CaptureJob): Promise<void> {
       outcome: stored.outcome,
       blockSignal: stored.block_signal as ScanOutcome['blockSignal'],
       httpStatus: stored.http_status,
+      hostingPlatform: stored.hosting_platform,
+      hostingCdn: stored.hosting_cdn,
       finalUrl: stored.final_url,
       title: stored.title,
       description: null,

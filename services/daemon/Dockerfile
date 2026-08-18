@@ -40,9 +40,10 @@ RUN corepack enable
 
 COPY --from=daemon-deploy /deploy/daemon/ ./
 
-# curl/unzip stay for the runtime Tranco/nuxt-versions ingest.
+# curl/unzip stay for the runtime Tranco/nuxt-versions ingest; sqlite3 for ad-hoc
+# queries against /data/nuxt-fyi.db over `fly ssh console`.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl unzip \
+ && apt-get install -y --no-install-recommends ca-certificates curl unzip sqlite3 \
  && rm -rf /var/lib/apt/lists/*
 
 # Nitro's standalone output bundles its own node_modules; no install needed at runtime.

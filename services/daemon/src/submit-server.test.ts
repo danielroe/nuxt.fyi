@@ -116,6 +116,8 @@ test('returns recently-scanned for domains scanned within RESCAN_AFTER_MS', () =
     outcome: 'ok',
     block_signal: null,
     http_status: 200,
+    hosting_platform: null,
+    hosting_cdn: null,
   }
   const { deps, enqueued } = makeDeps({ getScan: (d) => d === 'roe.dev' ? scan : undefined })
   const r = processSubmit('https://roe.dev', deps)
@@ -148,6 +150,8 @@ test('treats an old scan as not-recent and re-queues', () => {
     outcome: 'ok',
     block_signal: null,
     http_status: 200,
+    hosting_platform: null,
+    hosting_cdn: null,
   }
   const { deps, enqueued } = makeDeps({ getScan: () => ancient })
   const r = processSubmit('https://example.com', deps)

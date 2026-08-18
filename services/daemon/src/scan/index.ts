@@ -20,6 +20,8 @@ export interface ScanOutcome {
   outcome: ScanResultOutcome
   blockSignal: BlockSignal | null
   httpStatus: number | null
+  hostingPlatform: string | null
+  hostingCdn: string | null
   finalUrl: string | null
   title: string | null
   /** og:description / twitter:description / <meta name="description">, trimmed. */
@@ -106,6 +108,8 @@ export interface DetectionOutcome {
   outcome: ScanResultOutcome
   blockSignal: BlockSignal | null
   httpStatus: number | null
+  hostingPlatform: string | null
+  hostingCdn: string | null
   finalUrl: string | null
   title: string | null
   description: string | null
@@ -123,6 +127,8 @@ function emptyDetectionOutcome(domain: string, error: string | null): DetectionO
     outcome: 'error',
     blockSignal: null,
     httpStatus: null,
+    hostingPlatform: null,
+    hostingCdn: null,
     finalUrl: null,
     title: null,
     description: null,
@@ -161,6 +167,8 @@ export async function detectDomain(domain: string): Promise<DetectionOutcome> {
       outcome: 'ok',
       blockSignal: null,
       httpStatus: html.status,
+      hostingPlatform: html.hosting.platform,
+      hostingCdn: html.hosting.cdn,
       finalUrl: html.finalUrl,
       title: html.title,
       description: html.description,
@@ -227,6 +235,8 @@ export async function detectDomain(domain: string): Promise<DetectionOutcome> {
     outcome,
     blockSignal: html.blockSignal,
     httpStatus: html.status,
+    hostingPlatform: html.hosting.platform,
+    hostingCdn: html.hosting.cdn,
     finalUrl: html.finalUrl,
     title: html.title,
     description: html.description,

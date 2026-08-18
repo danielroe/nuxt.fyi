@@ -117,6 +117,8 @@ async function refresh(candidate: (typeof candidates)[number]): Promise<void> {
         outcome: outcome.outcome,
         blockSignal: outcome.blockSignal,
         httpStatus: outcome.httpStatus,
+        hostingPlatform: outcome.hostingPlatform,
+        hostingCdn: outcome.hostingCdn,
       })
     }
   }

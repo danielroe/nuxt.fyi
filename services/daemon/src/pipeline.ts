@@ -30,6 +30,8 @@ export function persistOutcome(outcome: ScanOutcome): void {
     outcome: outcome.outcome,
     block_signal: outcome.blockSignal,
     http_status: outcome.httpStatus,
+    hosting_platform: outcome.hostingPlatform,
+    hosting_cdn: outcome.hostingCdn,
   })
 }
 

@@ -118,6 +118,8 @@ for (const ddl of [
   `ALTER TABLE scans ADD COLUMN outcome TEXT`,
   `ALTER TABLE scans ADD COLUMN block_signal TEXT`,
   `ALTER TABLE scans ADD COLUMN http_status INTEGER`,
+  `ALTER TABLE scans ADD COLUMN hosting_platform TEXT`,
+  `ALTER TABLE scans ADD COLUMN hosting_cdn TEXT`,
 ]) {
   try { db.exec(ddl) }
   catch (err) {
@@ -146,8 +148,8 @@ const upsertDomainStmt = db.prepare(`
 const getScanStmt = db.prepare(`SELECT * FROM scans WHERE domain = ?`)
 
 const upsertScanStmt = db.prepare(`
-  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error, screenshot_key, og_image_key, nsfw_label, nsfw_score, nsfw_categories, nsfw_classified_at, outcome, block_signal, http_status)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error, screenshot_key, og_image_key, nsfw_label, nsfw_score, nsfw_categories, nsfw_classified_at, outcome, block_signal, http_status, hosting_platform, hosting_cdn)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(domain) DO UPDATE SET
     scanned_at = excluded.scanned_at,
     is_nuxt = excluded.is_nuxt,
@@ -168,7 +170,9 @@ const upsertScanStmt = db.prepare(`
     nsfw_classified_at = excluded.nsfw_classified_at,
     outcome = excluded.outcome,
     block_signal = excluded.block_signal,
-    http_status = excluded.http_status
+    http_status = excluded.http_status,
+    hosting_platform = excluded.hosting_platform,
+    hosting_cdn = excluded.hosting_cdn
 `)
 
 const updateImageStmt = db.prepare(`
@@ -203,8 +207,8 @@ const updateNsfwStmt = db.prepare(`
  * On insert, those columns are NULL by default.
  */
 const upsertDetectionStmt = db.prepare(`
-  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error, outcome, block_signal, http_status)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
+  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error, outcome, block_signal, http_status, hosting_platform, hosting_cdn)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(domain) DO UPDATE SET
     scanned_at = excluded.scanned_at,
     is_nuxt = excluded.is_nuxt,
@@ -218,7 +222,9 @@ const upsertDetectionStmt = db.prepare(`
     error = excluded.error,
     outcome = excluded.outcome,
     block_signal = excluded.block_signal,
-    http_status = excluded.http_status
+    http_status = excluded.http_status,
+    hosting_platform = excluded.hosting_platform,
+    hosting_cdn = excluded.hosting_cdn
 `)
 
 /**
@@ -267,6 +273,13 @@ export interface ScanRow {
   block_signal: string | null
   /** HTTP status of the HTML fetch, null when the fetch itself failed. */
   http_status: number | null
+  /** Origin hosting platform slug (e.g. 'vercel', 'netlify', 'fly'), header-detected.
+   *  Null when the origin isn't identifiable, including Cloudflare Pages/Workers sites
+   *  where only the CDN is visible. */
+  hosting_platform: string | null
+  /** Third-party CDN fronting the site (e.g. 'cloudflare', 'fastly'), independent of
+   *  the platform: vercel + cloudflare is a common combination. */
+  hosting_cdn: string | null
   /** ImageKit path (e.g. `/nuxt-fyi/screenshots/example.com.jpg`) for the screenshot
    *  uploaded at scan time. Null if upload failed or ImageKit isn't configured. */
   screenshot_key: string | null
@@ -357,6 +370,8 @@ export function recordDetection(input: {
   outcome: 'ok' | 'blocked' | 'error'
   blockSignal: string | null
   httpStatus: number | null
+  hostingPlatform: string | null
+  hostingCdn: string | null
 }): void {
   upsertDetectionStmt.run(
     input.domain,
@@ -373,6 +388,8 @@ export function recordDetection(input: {
     input.outcome,
     input.blockSignal,
     input.httpStatus,
+    input.hostingPlatform,
+    input.hostingCdn,
   )
 }
 
@@ -443,6 +460,8 @@ export function recordScan(row: Omit<ScanRow, 'scanned_at'> & { scanned_at?: num
     row.outcome,
     row.block_signal,
     row.http_status,
+    row.hosting_platform,
+    row.hosting_cdn,
   )
 }
 
