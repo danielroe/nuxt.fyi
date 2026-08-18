@@ -59,16 +59,6 @@ export const fixtureStats: StatsResponse = {
     lastScanAt: now,
   },
   versions,
-  signals: [
-    { name: 'window.__NUXT__', count: 4_812 },
-    { name: 'meta[name=generator]=Nuxt', count: 4_021 },
-    { name: '/_nuxt/ asset prefix', count: 3_887 },
-    { name: 'nuxt-data-hid', count: 2_944 },
-    { name: 'x-powered-by: Nuxt', count: 1_603 },
-    { name: 'nuxt-link', count: 1_287 },
-    { name: '__NUXT_DATA__ script', count: 1_054 },
-    { name: 'nuxt island marker', count: 612 },
-  ],
   hosting: [
     { label: 'vercel', count: 1_412 },
     { label: 'cloudflare (cdn)', count: 987 },

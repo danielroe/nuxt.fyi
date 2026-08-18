@@ -5,7 +5,6 @@ import { fixtureStats } from '../utils/fixtures'
 import { getPublishedNuxtVersions } from '../utils/nuxt-versions'
 
 interface CountRow { c: number }
-interface SignalListRow { signals: string }
 
 export default defineHandler((): StatsResponse => {
   if (process.env.NUXT_FIXTURES) return fixtureStats
@@ -48,19 +47,6 @@ export default defineHandler((): StatsResponse => {
     return { ...row, bucket }
   })
 
-  const sigRows = db.prepare(`SELECT signals FROM scans WHERE is_nuxt = 1`).all() as unknown as SignalListRow[]
-  const signalCounts = new Map<string, number>()
-  for (const row of sigRows) {
-    try {
-      for (const s of JSON.parse(row.signals) as Array<{ name: string }>) {
-        signalCounts.set(s.name, (signalCounts.get(s.name) ?? 0) + 1)
-      }
-    } catch { /* malformed; skip */ }
-  }
-  const signals = [...signalCounts.entries()]
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-
   const hosting = db.prepare(`
     SELECT COALESCE(
       hosting_platform,
@@ -75,5 +61,5 @@ export default defineHandler((): StatsResponse => {
     SELECT channel, COUNT(*) AS count FROM notifications GROUP BY channel
   `).all() as unknown as Array<{ channel: string, count: number }>
 
-  return { stats, versions, signals, hosting, notificationChannels }
+  return { stats, versions, hosting, notificationChannels }
 })

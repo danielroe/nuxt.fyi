@@ -36,7 +36,6 @@ export interface StatsResponse {
     lastScanAt: number
   }
   versions: Array<{ version: string, count: number, bucket: VersionBucket }>
-  signals: Array<{ name: string, count: number }>
   /** Hosting breakdown over confirmed Nuxt hits. `label` is the platform slug, the CDN
    *  slug suffixed " (cdn)" when only the fronting CDN is visible, or 'unknown'. */
   hosting: Array<{ label: string, count: number }>
