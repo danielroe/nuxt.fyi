@@ -13,7 +13,7 @@
 import { parseArgs } from 'node:util'
 import { log } from '../log.ts'
 import { DAY_MS, deriveHistory } from '../history.ts'
-import { listBootstrapObservations, listObservations, recordVersionCheck, replaceDerivedHistory } from '../store.ts'
+import { bootstrapObservations, countPendingBootstrap, listObservations, listPendingBootstrapObservations, replaceDerivedHistory } from '../store.ts'
 
 const USAGE = `usage: build-history [--interval-days N] [--no-bootstrap] [--dry-run]
 
@@ -46,28 +46,23 @@ if (!Number.isFinite(intervalDays) || intervalDays <= 0) {
 }
 
 let seeded = 0
+/** In dry-run the seed rows aren't written, so they're merged in memory instead;
+ *  otherwise the derivation below would report the shape of the un-seeded log. */
+let pendingObservations: ReturnType<typeof listPendingBootstrapObservations> = []
+
 if (!values['no-bootstrap']) {
-  const pending = listBootstrapObservations()
-  if (pending.length > 0 && !values['dry-run']) {
-    for (const row of pending) {
-      recordVersionCheck({
-        domain: row.domain,
-        isNuxt: row.is_nuxt === 1,
-        nuxtVersion: row.nuxt_version,
-        outcome: row.outcome === 'blocked' || row.outcome === 'error' ? row.outcome : 'ok',
-        blockSignal: null,
-        checkedAt: row.scanned_at,
-      })
-      seeded++
-    }
+  if (values['dry-run']) {
+    seeded = countPendingBootstrap()
+    pendingObservations = listPendingBootstrapObservations()
   }
   else {
-    seeded = pending.length
+    seeded = bootstrapObservations()
   }
-  log.info(`[history] seeded ${seeded} observation(s) from existing scans${values['dry-run'] ? ' (dry-run, not written)' : ''}`)
+  log.info(`[history] seeded ${seeded} observation(s) from existing scans${values['dry-run'] ? ' (dry-run, merged in memory only)' : ''}`)
 }
 
-const observations = listObservations()
+const observations = [...listObservations(), ...pendingObservations]
+  .sort((a, b) => a.checked_at - b.checked_at || a.domain.localeCompare(b.domain))
 const { snapshots, events } = deriveHistory(observations, intervalDays * DAY_MS)
 
 if (!values['dry-run']) replaceDerivedHistory(snapshots, events)
@@ -79,7 +74,9 @@ const byKind = events.reduce<Record<string, number>>((acc, e) => {
 const snapshotTimes = [...new Set(snapshots.map(s => s.taken_at))]
 
 process.stdout.write(`${JSON.stringify({
-  observations: observations.length,
+  /** Only domains that have ever been Nuxt participate; never-Nuxt rows are stored for
+   *  future adoption labelling but can't affect a snapshot or event. */
+  observationsConsidered: observations.length,
   seeded,
   snapshots: snapshotTimes.length,
   from: snapshotTimes[0] ? new Date(snapshotTimes[0]).toISOString() : null,

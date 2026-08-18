@@ -100,9 +100,6 @@ db.exec(`
     block_signal  TEXT
   );
 
-  CREATE INDEX IF NOT EXISTS idx_version_checks_domain
-    ON version_checks (domain, checked_at);
-
   CREATE INDEX IF NOT EXISTS idx_version_checks_time
     ON version_checks (checked_at);
 
@@ -134,6 +131,10 @@ db.exec(`
 // Wrapped because the index can't be created if pre-existing rows collide.
 try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_version_checks_unique ON version_checks (domain, checked_at)`) }
 catch { /* historical duplicates present; dedupe is best-effort from here */ }
+
+// Superseded by idx_version_checks_unique, which covers the same (domain, checked_at)
+// lookups. Dropping it matters at corpus scale: the table carries a row per domain.
+db.exec(`DROP INDEX IF EXISTS idx_version_checks_domain`)
 
 // Idempotent forward migrations for columns added after the first release. SQLite has no
 // ADD COLUMN IF NOT EXISTS, so we swallow the "duplicate column" error.
@@ -580,19 +581,62 @@ export interface ObservationRow {
 export function listObservations(): ObservationRow[] {
   return db.prepare(`
     SELECT domain, checked_at, is_nuxt, nuxt_version, outcome, observations FROM version_checks
+    WHERE domain IN (${EVER_NUXT})
     ORDER BY checked_at ASC, domain ASC
   `).all() as unknown as ObservationRow[]
 }
 
-/** Domains with no observation yet, seeded from their last real scan so history starts
- *  with the corpus we already have rather than from empty. */
-export function listBootstrapObservations(): Array<{ domain: string, scanned_at: number, is_nuxt: number, nuxt_version: string | null, outcome: string }> {
-  return db.prepare(`
-    SELECT domain, scanned_at, is_nuxt, nuxt_version, COALESCE(outcome, 'ok') AS outcome
+/** Domains whose state has been observed as Nuxt at some point, in either table. Only
+ *  these can appear in a snapshot or produce a churn event, so the derivation loads no
+ *  more than this. Rows for never-Nuxt domains still earn their keep: they're what makes
+ *  a later adoption distinguishable from a first sighting. */
+const EVER_NUXT = `
+  SELECT domain FROM version_checks WHERE is_nuxt = 1
+  UNION
+  SELECT domain FROM scans WHERE is_nuxt = 1
+`
+
+/**
+ * Seeds the log from `scans`, using each row's `scanned_at` as the observation time, so
+ * the curve starts with the history we already have instead of from empty. Runs entirely
+ * inside SQLite as one statement: at corpus scale a per-row round trip is the difference
+ * between seconds and hours, and nothing is held in JS memory.
+ */
+export function bootstrapObservations(): number {
+  const result = db.prepare(`
+    INSERT OR IGNORE INTO version_checks
+      (domain, checked_at, is_nuxt, nuxt_version, outcome, block_signal, observations)
+    SELECT domain, scanned_at, is_nuxt, nuxt_version,
+           CASE WHEN outcome IN ('blocked', 'error') THEN outcome ELSE 'ok' END,
+           NULL, 1
     FROM scans s
     WHERE redirected_to IS NULL
       AND NOT EXISTS (SELECT 1 FROM version_checks v WHERE v.domain = s.domain)
-  `).all() as unknown as Array<{ domain: string, scanned_at: number, is_nuxt: number, nuxt_version: string | null, outcome: string }>
+  `).run()
+  return Number(result.changes)
+}
+
+export function countPendingBootstrap(): number {
+  const row = db.prepare(`
+    SELECT COUNT(*) AS c FROM scans s
+    WHERE redirected_to IS NULL
+      AND NOT EXISTS (SELECT 1 FROM version_checks v WHERE v.domain = s.domain)
+  `).get() as { c: number }
+  return row.c
+}
+
+/** The would-be bootstrap rows, restricted to domains that can affect the derivation.
+ *  Lets --dry-run report the real shape of the history without writing anything. */
+export function listPendingBootstrapObservations(): ObservationRow[] {
+  return db.prepare(`
+    SELECT domain, scanned_at AS checked_at, is_nuxt, nuxt_version,
+           CASE WHEN outcome IN ('blocked', 'error') THEN outcome ELSE 'ok' END AS outcome,
+           1 AS observations
+    FROM scans s
+    WHERE redirected_to IS NULL
+      AND NOT EXISTS (SELECT 1 FROM version_checks v WHERE v.domain = s.domain)
+      AND s.domain IN (${EVER_NUXT})
+  `).all() as unknown as ObservationRow[]
 }
 
 export interface SnapshotRow { taken_at: number, label: string, count: number }
