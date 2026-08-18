@@ -29,6 +29,7 @@ export interface StatsResponse {
     errors: number
     notifications: number
     pendingScan: number
+    blocked: number
     // The handler's `as unknown as CountRow` cast already asserts non-null on this
     // (SQL `MAX` can return null on an empty table, but we accept that risk to keep
     // the template binding for `<NuxtTime :datetime>` simple).
@@ -36,6 +37,9 @@ export interface StatsResponse {
   }
   versions: Array<{ version: string, count: number, bucket: VersionBucket }>
   signals: Array<{ name: string, count: number }>
+  /** Hosting breakdown over confirmed Nuxt hits. `label` is the platform slug, the CDN
+   *  slug suffixed " (cdn)" when only the fronting CDN is visible, or 'unknown'. */
+  hosting: Array<{ label: string, count: number }>
   notificationChannels: Array<{ channel: string, count: number }>
 }
 
@@ -79,6 +83,13 @@ export interface HitDetailResponse {
   finalUrl: string | null
   title: string | null
   error: string | null
+  /** 'blocked' means a bot-mitigation wall answered instead of the real page; rows
+   *  written before the column existed are null. */
+  outcome: 'ok' | 'blocked' | 'error' | null
+  blockSignal: string | null
+  httpStatus: number | null
+  hostingPlatform: string | null
+  hostingCdn: string | null
   image: ImageSources
   redirectedTo: string | null
   firstSeenAt: number | null

@@ -19,6 +19,7 @@ export default defineHandler((): StatsResponse => {
     nuxtHits: c('SELECT COUNT(*) AS c FROM scans WHERE is_nuxt = 1'),
     errors: c('SELECT COUNT(*) AS c FROM scans WHERE error IS NOT NULL'),
     notifications: c('SELECT COUNT(*) AS c FROM notifications'),
+    blocked: c(`SELECT COUNT(*) AS c FROM scans WHERE outcome = 'blocked'`),
     pendingScan: c(`
       SELECT COUNT(*) AS c FROM domains d
       WHERE NOT EXISTS (SELECT 1 FROM scans s WHERE s.domain = d.domain)
@@ -60,9 +61,19 @@ export default defineHandler((): StatsResponse => {
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
 
+  const hosting = db.prepare(`
+    SELECT COALESCE(
+      hosting_platform,
+      CASE WHEN hosting_cdn IS NOT NULL THEN hosting_cdn || ' (cdn)' END,
+      'unknown'
+    ) AS label, COUNT(*) AS count
+    FROM scans WHERE is_nuxt = 1
+    GROUP BY label ORDER BY count DESC
+  `).all() as unknown as Array<{ label: string, count: number }>
+
   const notificationChannels = db.prepare(`
     SELECT channel, COUNT(*) AS count FROM notifications GROUP BY channel
   `).all() as unknown as Array<{ channel: string, count: number }>
 
-  return { stats, versions, signals, notificationChannels }
+  return { stats, versions, signals, hosting, notificationChannels }
 })

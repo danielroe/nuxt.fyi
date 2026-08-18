@@ -52,6 +52,11 @@ export interface ScanRow {
   nsfw_classified_at: number | null
   redirected_to: string | null
   error: string | null
+  outcome: 'ok' | 'blocked' | 'error' | null
+  block_signal: string | null
+  http_status: number | null
+  hosting_platform: string | null
+  hosting_cdn: string | null
 }
 
 export interface DomainRow {

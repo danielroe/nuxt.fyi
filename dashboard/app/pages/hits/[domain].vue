@@ -94,6 +94,12 @@ const backTo = computed<RouteLocationRaw>(() => {
       <h2>Detection</h2>
       <p class="muted small">
         confidence {{ data.confidence }} &middot; scanned <NuxtTime :datetime="data.scannedAt" relative />
+        <template v-if="data.hostingPlatform"> &middot; hosted on <strong class="hosting">{{ data.hostingPlatform }}</strong></template>
+        <template v-if="data.hostingCdn"> &middot; behind <strong class="hosting">{{ data.hostingCdn }}</strong></template>
+      </p>
+      <p v-if="data.outcome === 'blocked'" class="blocked-note">
+        last scan was blocked by a bot wall<template v-if="data.blockSignal"> ({{ data.blockSignal }})</template>;
+        this data may be stale or incomplete.
       </p>
       <ul class="signals">
         <li v-for="sig in data.signals" :key="sig.name">
@@ -147,4 +153,6 @@ h1 { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .notifications strong.channel-discord { color: #8e98f8; }
 .notifications strong.channel-bluesky { color: #4ca3ff; }
 .small { font-size: 0.85rem; }
+.hosting { color: var(--fg); }
+.blocked-note { color: #e0a458; font-size: 0.9rem; }
 </style>

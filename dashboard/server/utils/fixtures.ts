@@ -54,6 +54,7 @@ export const fixtureStats: StatsResponse = {
     nuxtHits,
     errors: 2_413,
     notifications: 8_927,
+    blocked: 1_184,
     pendingScan: 22_216,
     lastScanAt: now,
   },
@@ -67,6 +68,15 @@ export const fixtureStats: StatsResponse = {
     { name: 'nuxt-link', count: 1_287 },
     { name: '__NUXT_DATA__ script', count: 1_054 },
     { name: 'nuxt island marker', count: 612 },
+  ],
+  hosting: [
+    { label: 'vercel', count: 1_412 },
+    { label: 'cloudflare (cdn)', count: 987 },
+    { label: 'netlify', count: 604 },
+    { label: 'aws-cloudfront (cdn)', count: 311 },
+    { label: 'fly', count: 122 },
+    { label: 'github-pages', count: 87 },
+    { label: 'unknown', count: 1_654 },
   ],
   notificationChannels: [
     { channel: 'bluesky', count: 8_204 },

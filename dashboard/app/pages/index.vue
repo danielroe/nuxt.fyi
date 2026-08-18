@@ -53,7 +53,8 @@ const unverifiedCount = computed(() =>
     <p class="muted small">
       last scan <NuxtTime :datetime="data.stats.lastScanAt" relative /> &middot;
       {{ fmtNumber(data.stats.pendingScan) }} seen but never scanned &middot;
-      {{ fmtNumber(data.stats.errors) }} scans errored
+      {{ fmtNumber(data.stats.errors) }} scans errored &middot;
+      {{ fmtNumber(data.stats.blocked) }} blocked by bot walls
     </p>
 
     <SubmitForm />
