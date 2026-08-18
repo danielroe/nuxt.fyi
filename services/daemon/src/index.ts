@@ -9,13 +9,16 @@ import { Queue } from './queue.ts'
 import {
   getScan,
   hasReplied,
+  lastVersionCheck,
   markReplySent,
   pendingRepliesForDomain,
   recordCapture,
   recordDetection,
   recordDomainSeen,
   recordReplyRequest,
+  recordVersionCheck,
 } from './store.ts'
+import { mergeDetection } from './detection-state.ts'
 import { startSubmitServer } from './submit-server.ts'
 import { captureForDomain, detectDomain, type DetectionOutcome, type ScanOutcome } from './scan/index.ts'
 import { dispatchNotifications } from './pipeline.ts'
@@ -141,12 +144,31 @@ async function handleDetection({ domain }: DetectionJob): Promise<void> {
     }
 
     const outcome = await detectDomain(domain)
-    recordDetection({
-      domain: outcome.domain,
+
+    // The raw observation is history; what we store is smoothed. A previous negative
+    // corroborates this one, which is what lets a genuine migration off Nuxt land
+    // without a single flaky scan being able to.
+    const previousCheck = lastVersionCheck(domain)
+    recordVersionCheck({
+      domain,
       isNuxt: outcome.detection.isNuxt,
       nuxtVersion: outcome.detection.nuxtVersion,
-      confidence: outcome.detection.confidence,
-      signals: JSON.stringify(outcome.detection.signals),
+      outcome: outcome.outcome,
+      blockSignal: outcome.blockSignal,
+    })
+    const merged = mergeDetection(existing, outcome, {
+      allowDowngrade: previousCheck?.outcome === 'ok' && previousCheck.is_nuxt === 0,
+    })
+    if (merged.heldDowngrade) {
+      log.warn(`[detect] ${domain} read as non-Nuxt but was ${existing?.nuxt_version ?? 'a confirmed hit'}; awaiting a second opinion`)
+    }
+
+    recordDetection({
+      domain: outcome.domain,
+      isNuxt: merged.isNuxt,
+      nuxtVersion: merged.nuxtVersion,
+      confidence: merged.confidence,
+      signals: merged.signals,
       finalUrl: outcome.finalUrl,
       title: outcome.title,
       ogImage: outcome.ogImage,
@@ -167,9 +189,9 @@ async function handleDetection({ domain }: DetectionJob): Promise<void> {
       return
     }
 
-    if (outcome.detection.isNuxt && outcome.finalUrl) {
+    if (merged.isNuxt && outcome.finalUrl) {
       nuxtFound++
-      log.success(`[detect] ${domain} is Nuxt (confidence=${outcome.detection.confidence}, version=${outcome.detection.nuxtVersion ?? 'unknown'})`)
+      log.success(`[detect] ${domain} is Nuxt (confidence=${merged.confidence}, version=${merged.nuxtVersion ?? 'unknown'})`)
       captureQueue.enqueue({
         domain: outcome.domain,
         finalUrl: outcome.finalUrl,

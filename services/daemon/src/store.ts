@@ -102,7 +102,38 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_version_checks_domain
     ON version_checks (domain, checked_at);
+
+  CREATE INDEX IF NOT EXISTS idx_version_checks_time
+    ON version_checks (checked_at);
+
+  -- Materialised corpus distribution at points in time. Derived from version_checks by
+  -- the build-history CLI and replaced wholesale on each run, so the derivation rules
+  -- can change without migrating stored history.
+  CREATE TABLE IF NOT EXISTS version_snapshots (
+    taken_at INTEGER NOT NULL,
+    label    TEXT NOT NULL,
+    count    INTEGER NOT NULL,
+    PRIMARY KEY (taken_at, label)
+  );
+
+  -- Curated churn: a site adopting Nuxt, leaving it, or changing version. Also derived
+  -- and replaced wholesale.
+  CREATE TABLE IF NOT EXISTS domain_events (
+    domain       TEXT NOT NULL,
+    at           INTEGER NOT NULL,
+    kind         TEXT NOT NULL,
+    from_version TEXT,
+    to_version   TEXT,
+    PRIMARY KEY (domain, at, kind)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_domain_events_at ON domain_events (at, kind);
 `)
+
+// One observation per domain per instant; a repeat at the same ms is a duplicate write.
+// Wrapped because the index can't be created if pre-existing rows collide.
+try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_version_checks_unique ON version_checks (domain, checked_at)`) }
+catch { /* historical duplicates present; dedupe is best-effort from here */ }
 
 // Idempotent forward migrations for columns added after the first release. SQLite has no
 // ADD COLUMN IF NOT EXISTS, so we swallow the "duplicate column" error.
@@ -120,6 +151,8 @@ for (const ddl of [
   `ALTER TABLE scans ADD COLUMN http_status INTEGER`,
   `ALTER TABLE scans ADD COLUMN hosting_platform TEXT`,
   `ALTER TABLE scans ADD COLUMN hosting_cdn TEXT`,
+  `ALTER TABLE version_checks ADD COLUMN last_confirmed_at INTEGER`,
+  `ALTER TABLE version_checks ADD COLUMN observations INTEGER NOT NULL DEFAULT 1`,
 ]) {
   try { db.exec(ddl) }
   catch (err) {
@@ -466,14 +499,44 @@ export function recordScan(row: Omit<ScanRow, 'scanned_at'> & { scanned_at?: num
 }
 
 const insertVersionCheckStmt = db.prepare(`
-  INSERT INTO version_checks (domain, checked_at, is_nuxt, nuxt_version, outcome, block_signal)
+  INSERT OR IGNORE INTO version_checks (domain, checked_at, is_nuxt, nuxt_version, outcome, block_signal)
   VALUES (?, ?, ?, ?, ?, ?)
 `)
 
+const lastVersionCheckStmt = db.prepare(`
+  SELECT rowid, checked_at, is_nuxt, nuxt_version, outcome, block_signal, observations FROM version_checks
+  WHERE domain = ? ORDER BY checked_at DESC LIMIT 1
+`)
+
+const confirmVersionCheckStmt = db.prepare(`
+  UPDATE version_checks SET last_confirmed_at = ?, observations = observations + 1 WHERE rowid = ?
+`)
+
+export interface VersionCheckRow {
+  rowid: number
+  checked_at: number
+  is_nuxt: number
+  nuxt_version: string | null
+  outcome: string
+  block_signal: string | null
+  /** How many times we've observed this same state. Corroboration: a state seen once
+   *  could be a fluke, a state seen twice is probably real. */
+  observations: number
+}
+
+export function lastVersionCheck(domain: string): VersionCheckRow | undefined {
+  return lastVersionCheckStmt.get(domain) as VersionCheckRow | undefined
+}
+
 /**
- * Appends one row per refresh attempt, blocked and errored ones included, so version
- * adoption can be charted over time and block rates are visible per domain. The `scans`
- * row remains the latest-known-good snapshot; this table is the history.
+ * Records the raw observation, blocked and errored ones included. This is the history:
+ * unlike `scans` it is never smoothed, because the churn derivation needs to see the
+ * unfiltered sequence (a held downgrade is still a real negative observation).
+ *
+ * Each row is a state interval rather than a single reading. Re-observing the same state
+ * bumps `observations` and `last_confirmed_at` instead of appending, which keeps the
+ * table compact while still recording corroboration: the churn rules need to know that
+ * we saw "not Nuxt" twice, not merely that the state changed once.
  */
 export function recordVersionCheck(input: {
   domain: string
@@ -481,10 +544,22 @@ export function recordVersionCheck(input: {
   nuxtVersion: string | null
   outcome: 'ok' | 'blocked' | 'error'
   blockSignal: string | null
+  checkedAt?: number
 }): void {
+  const previous = lastVersionCheck(input.domain)
+  if (
+    previous
+    && previous.is_nuxt === (input.isNuxt ? 1 : 0)
+    && previous.nuxt_version === input.nuxtVersion
+    && previous.outcome === input.outcome
+    && previous.block_signal === input.blockSignal
+  ) {
+    confirmVersionCheckStmt.run(input.checkedAt ?? Date.now(), previous.rowid)
+    return
+  }
   insertVersionCheckStmt.run(
     input.domain,
-    Date.now(),
+    input.checkedAt ?? Date.now(),
     input.isNuxt ? 1 : 0,
     input.nuxtVersion,
     input.outcome,
@@ -492,10 +567,80 @@ export function recordVersionCheck(input: {
   )
 }
 
+export interface ObservationRow {
+  domain: string
+  checked_at: number
+  is_nuxt: number
+  nuxt_version: string | null
+  outcome: string
+  observations: number
+}
+
+/** Every state interval in chronological order, for a single-pass history derivation. */
+export function listObservations(): ObservationRow[] {
+  return db.prepare(`
+    SELECT domain, checked_at, is_nuxt, nuxt_version, outcome, observations FROM version_checks
+    ORDER BY checked_at ASC, domain ASC
+  `).all() as unknown as ObservationRow[]
+}
+
+/** Domains with no observation yet, seeded from their last real scan so history starts
+ *  with the corpus we already have rather than from empty. */
+export function listBootstrapObservations(): Array<{ domain: string, scanned_at: number, is_nuxt: number, nuxt_version: string | null, outcome: string }> {
+  return db.prepare(`
+    SELECT domain, scanned_at, is_nuxt, nuxt_version, COALESCE(outcome, 'ok') AS outcome
+    FROM scans s
+    WHERE redirected_to IS NULL
+      AND NOT EXISTS (SELECT 1 FROM version_checks v WHERE v.domain = s.domain)
+  `).all() as unknown as Array<{ domain: string, scanned_at: number, is_nuxt: number, nuxt_version: string | null, outcome: string }>
+}
+
+export interface SnapshotRow { taken_at: number, label: string, count: number }
+export interface DomainEventRow {
+  domain: string
+  at: number
+  kind: 'adopted' | 'departed' | 'upgraded' | 'downgraded'
+  from_version: string | null
+  to_version: string | null
+}
+
+const insertSnapshotStmt = db.prepare(`INSERT OR REPLACE INTO version_snapshots (taken_at, label, count) VALUES (?, ?, ?)`)
+const insertEventStmt = db.prepare(`INSERT OR REPLACE INTO domain_events (domain, at, kind, from_version, to_version) VALUES (?, ?, ?, ?, ?)`)
+
+/** Replaces derived history atomically so a failed run can't leave it half-written. */
+export function replaceDerivedHistory(snapshots: SnapshotRow[], events: DomainEventRow[]): void {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.exec('DELETE FROM version_snapshots')
+    db.exec('DELETE FROM domain_events')
+    for (const s of snapshots) insertSnapshotStmt.run(s.taken_at, s.label, s.count)
+    for (const e of events) insertEventStmt.run(e.domain, e.at, e.kind, e.from_version, e.to_version)
+    db.exec('COMMIT')
+  }
+  catch (err) {
+    db.exec('ROLLBACK')
+    throw err
+  }
+}
+
+export function listSnapshots(): SnapshotRow[] {
+  return db.prepare(`SELECT taken_at, label, count FROM version_snapshots ORDER BY taken_at ASC`).all() as unknown as SnapshotRow[]
+}
+
+export function listRecentEvents(kinds: string[], limit: number): DomainEventRow[] {
+  const placeholders = kinds.map(() => '?').join(',')
+  return db.prepare(`
+    SELECT domain, at, kind, from_version, to_version FROM domain_events
+    WHERE kind IN (${placeholders}) ORDER BY at DESC LIMIT ?
+  `).all(...kinds, limit) as unknown as DomainEventRow[]
+}
+
 export interface RefreshCandidate {
   domain: string
   is_nuxt: number
   nuxt_version: string | null
+  confidence: number
+  signals: string
   outcome: string
 }
 
@@ -515,7 +660,7 @@ export function listRefreshCandidates(opts: { nuxtOnly: boolean, blockedOnly: bo
         ? `outcome = 'error'`
         : opts.nuxtOnly ? 'is_nuxt = 1' : '1 = 1'
   return db.prepare(`
-    SELECT domain, is_nuxt, nuxt_version, outcome FROM scans
+    SELECT domain, is_nuxt, nuxt_version, confidence, signals, outcome FROM scans
     WHERE redirected_to IS NULL AND ${where}
     ORDER BY domain
   `).all() as unknown as RefreshCandidate[]

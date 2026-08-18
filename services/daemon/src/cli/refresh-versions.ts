@@ -17,7 +17,8 @@
 import { parseArgs } from 'node:util'
 import { log } from '../log.ts'
 import { detectDomain } from '../scan/index.ts'
-import { listRefreshCandidates, recordDetection, recordVersionCheck } from '../store.ts'
+import { lastVersionCheck, listRefreshCandidates, recordDetection, recordVersionCheck } from '../store.ts'
+import { mergeDetection } from '../detection-state.ts'
 
 const USAGE = `usage: refresh-versions [--all | --blocked | --errored] [--concurrency N] [--limit N] [--dry-run] [--verbose]
 
@@ -80,6 +81,7 @@ async function refresh(candidate: (typeof candidates)[number]): Promise<void> {
   const { domain } = candidate
   try {
     const wasNuxt = candidate.is_nuxt === 1
+    const previousCheck = lastVersionCheck(domain)
     const outcome = await detectDomain(domain, { deepVersionScan: wasNuxt && !!candidate.nuxt_version })
     if (!values['dry-run']) {
       recordVersionCheck({
@@ -97,20 +99,25 @@ async function refresh(candidate: (typeof candidates)[number]): Promise<void> {
       return
     }
 
+    const corroborated = previousCheck?.outcome === 'ok' && previousCheck.is_nuxt === 0
+    const merged = mergeDetection(candidate, outcome, {
+      allowDowngrade: values['allow-downgrade'] || corroborated,
+    })
+
     if (wasNuxt && !outcome.detection.isNuxt) {
       const note = `${domain}: was ${candidate.nuxt_version ?? 'nuxt (version unknown)'}, now reads as not-nuxt`
       downgrades.push(note)
-      if (!values['allow-downgrade']) {
+      if (merged.heldDowngrade) {
         counts.downgradeHeld++
         log.warn(`[refresh] ${note}; holding (pass --allow-downgrade to persist)`)
         return
       }
       counts.statusChanged++
-      log.info(`[refresh] ${note}; persisting`)
+      log.info(`[refresh] ${note}; persisting${corroborated ? ' (corroborated by a previous check)' : ''}`)
     }
 
-    const nextVersion = outcome.detection.nuxtVersion ?? (outcome.detection.isNuxt ? candidate.nuxt_version : null)
-    if (outcome.detection.isNuxt && !outcome.detection.nuxtVersion && candidate.nuxt_version) {
+    const nextVersion = merged.nuxtVersion
+    if (merged.heldVersion) {
       counts.versionHeld++
       log.debug(`[refresh] ${domain} version not re-detected; keeping ${candidate.nuxt_version}`)
     }
@@ -130,10 +137,10 @@ async function refresh(candidate: (typeof candidates)[number]): Promise<void> {
     if (!values['dry-run']) {
       recordDetection({
         domain: outcome.domain,
-        isNuxt: outcome.detection.isNuxt,
+        isNuxt: merged.isNuxt,
         nuxtVersion: nextVersion,
-        confidence: outcome.detection.confidence,
-        signals: JSON.stringify(outcome.detection.signals),
+        confidence: merged.confidence,
+        signals: merged.signals,
         finalUrl: outcome.finalUrl,
         title: outcome.title,
         ogImage: outcome.ogImage,
