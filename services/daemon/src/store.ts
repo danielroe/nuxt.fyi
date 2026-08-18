@@ -90,6 +90,18 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_reply_requests_pending
     ON reply_requests (domain) WHERE replied_at IS NULL;
+
+  CREATE TABLE IF NOT EXISTS version_checks (
+    domain        TEXT NOT NULL,
+    checked_at    INTEGER NOT NULL,
+    is_nuxt       INTEGER NOT NULL,
+    nuxt_version  TEXT,
+    outcome       TEXT NOT NULL,
+    block_signal  TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_version_checks_domain
+    ON version_checks (domain, checked_at);
 `)
 
 // Idempotent forward migrations for columns added after the first release. SQLite has no
@@ -432,6 +444,62 @@ export function recordScan(row: Omit<ScanRow, 'scanned_at'> & { scanned_at?: num
     row.block_signal,
     row.http_status,
   )
+}
+
+const insertVersionCheckStmt = db.prepare(`
+  INSERT INTO version_checks (domain, checked_at, is_nuxt, nuxt_version, outcome, block_signal)
+  VALUES (?, ?, ?, ?, ?, ?)
+`)
+
+/**
+ * Appends one row per refresh attempt, blocked and errored ones included, so version
+ * adoption can be charted over time and block rates are visible per domain. The `scans`
+ * row remains the latest-known-good snapshot; this table is the history.
+ */
+export function recordVersionCheck(input: {
+  domain: string
+  isNuxt: boolean
+  nuxtVersion: string | null
+  outcome: 'ok' | 'blocked' | 'error'
+  blockSignal: string | null
+}): void {
+  insertVersionCheckStmt.run(
+    input.domain,
+    Date.now(),
+    input.isNuxt ? 1 : 0,
+    input.nuxtVersion,
+    input.outcome,
+    input.blockSignal,
+  )
+}
+
+export interface RefreshCandidate {
+  domain: string
+  is_nuxt: number
+  nuxt_version: string | null
+  outcome: string
+}
+
+/**
+ * Domains eligible for a detection-only refresh. Redirect pointer rows are excluded:
+ * their detection lives under the destination domain. `nuxtOnly` (the default sweep)
+ * restricts to confirmed hits; `blockedOnly` targets rows whose last scan hit a wall;
+ * `erroredOnly` targets rows whose last scan failed outright, which is where blocks
+ * recorded before block detection existed will be hiding.
+ */
+export function listRefreshCandidates(opts: { nuxtOnly: boolean, blockedOnly: boolean, erroredOnly: boolean }): RefreshCandidate[] {
+  const where = opts.blockedOnly && opts.erroredOnly
+    ? `outcome IN ('blocked', 'error')`
+    : opts.blockedOnly
+      ? `outcome = 'blocked'`
+      : opts.erroredOnly
+        ? `outcome = 'error'`
+        : opts.nuxtOnly ? 'is_nuxt = 1' : '1 = 1'
+  return db.prepare(`
+    SELECT domain, is_nuxt, nuxt_version, outcome FROM scans
+    WHERE redirected_to IS NULL AND ${where}
+    ORDER BY domain
+  `).all() as unknown as RefreshCandidate[]
 }
 
 export function hasNotified(domain: string, channel: string): boolean {

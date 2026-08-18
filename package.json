@@ -16,6 +16,7 @@
     "dev:scanner": "pnpm --filter @nuxt-fyi/scanner dev",
     "probe": "pnpm --filter @nuxt-fyi/daemon probe",
     "rescan": "pnpm --filter @nuxt-fyi/daemon rescan",
+    "refresh-versions": "pnpm --filter @nuxt-fyi/daemon refresh-versions",
     "stats": "pnpm --filter @nuxt-fyi/daemon stats",
     "status": "pnpm --filter @nuxt-fyi/daemon status",
     "test": "pnpm -r --workspace-concurrency=1 test",
