@@ -27,6 +27,9 @@ export function persistOutcome(outcome: ScanOutcome): void {
     nsfw_classified_at: outcome.nsfwClassifiedAt,
     redirected_to: outcome.redirectedTo,
     error: outcome.error,
+    outcome: outcome.outcome,
+    block_signal: outcome.blockSignal,
+    http_status: outcome.httpStatus,
   })
 }
 

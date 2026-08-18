@@ -103,12 +103,25 @@ for (const ddl of [
   `ALTER TABLE scans ADD COLUMN nsfw_score REAL`,
   `ALTER TABLE scans ADD COLUMN nsfw_categories TEXT`,
   `ALTER TABLE scans ADD COLUMN nsfw_classified_at INTEGER`,
+  `ALTER TABLE scans ADD COLUMN outcome TEXT`,
+  `ALTER TABLE scans ADD COLUMN block_signal TEXT`,
+  `ALTER TABLE scans ADD COLUMN http_status INTEGER`,
 ]) {
   try { db.exec(ddl) }
   catch (err) {
     if (!/duplicate column name/i.test((err as Error).message)) throw err
   }
 }
+
+// One-off backfill for rows written before the outcome column existed. Capture-stage
+// errors are prefixed "screenshot:" and don't invalidate the detection, so those rows
+// count as ok; anything else with an error never completed detection.
+db.exec(`
+  UPDATE scans SET outcome = CASE
+    WHEN error IS NOT NULL AND error NOT LIKE 'screenshot:%' THEN 'error'
+    ELSE 'ok'
+  END WHERE outcome IS NULL
+`)
 
 const upsertDomainStmt = db.prepare(`
   INSERT INTO domains (domain, first_seen_at, last_seen_at, seen_count)
@@ -121,8 +134,8 @@ const upsertDomainStmt = db.prepare(`
 const getScanStmt = db.prepare(`SELECT * FROM scans WHERE domain = ?`)
 
 const upsertScanStmt = db.prepare(`
-  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error, screenshot_key, og_image_key, nsfw_label, nsfw_score, nsfw_categories, nsfw_classified_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error, screenshot_key, og_image_key, nsfw_label, nsfw_score, nsfw_categories, nsfw_classified_at, outcome, block_signal, http_status)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(domain) DO UPDATE SET
     scanned_at = excluded.scanned_at,
     is_nuxt = excluded.is_nuxt,
@@ -140,7 +153,10 @@ const upsertScanStmt = db.prepare(`
     nsfw_label = excluded.nsfw_label,
     nsfw_score = excluded.nsfw_score,
     nsfw_categories = excluded.nsfw_categories,
-    nsfw_classified_at = excluded.nsfw_classified_at
+    nsfw_classified_at = excluded.nsfw_classified_at,
+    outcome = excluded.outcome,
+    block_signal = excluded.block_signal,
+    http_status = excluded.http_status
 `)
 
 const updateImageStmt = db.prepare(`
@@ -175,8 +191,8 @@ const updateNsfwStmt = db.prepare(`
  * On insert, those columns are NULL by default.
  */
 const upsertDetectionStmt = db.prepare(`
-  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+  INSERT INTO scans (domain, scanned_at, is_nuxt, nuxt_version, confidence, signals, final_url, title, screenshot_path, og_image, redirected_to, error, outcome, block_signal, http_status)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(domain) DO UPDATE SET
     scanned_at = excluded.scanned_at,
     is_nuxt = excluded.is_nuxt,
@@ -187,7 +203,10 @@ const upsertDetectionStmt = db.prepare(`
     title = excluded.title,
     og_image = excluded.og_image,
     redirected_to = excluded.redirected_to,
-    error = excluded.error
+    error = excluded.error,
+    outcome = excluded.outcome,
+    block_signal = excluded.block_signal,
+    http_status = excluded.http_status
 `)
 
 /**
@@ -228,6 +247,14 @@ export interface ScanRow {
    *  Nuxt detection was performed against that destination, not this row's domain. */
   redirected_to: string | null
   error: string | null
+  /** How the scan attempt went: 'ok', 'blocked' (bot-mitigation wall answered instead
+   *  of the real page, so is_nuxt = 0 is untrustworthy), or 'error'. */
+  outcome: 'ok' | 'blocked' | 'error'
+  /** Which mitigation was detected when outcome = 'blocked' (or when a confirmed hit
+   *  still tripped a vendor marker), e.g. 'cloudflare-challenge', 'datadome'. */
+  block_signal: string | null
+  /** HTTP status of the HTML fetch, null when the fetch itself failed. */
+  http_status: number | null
   /** ImageKit path (e.g. `/nuxt-fyi/screenshots/example.com.jpg`) for the screenshot
    *  uploaded at scan time. Null if upload failed or ImageKit isn't configured. */
   screenshot_key: string | null
@@ -315,6 +342,9 @@ export function recordDetection(input: {
   ogImage: string | null
   redirectedTo: string | null
   error: string | null
+  outcome: 'ok' | 'blocked' | 'error'
+  blockSignal: string | null
+  httpStatus: number | null
 }): void {
   upsertDetectionStmt.run(
     input.domain,
@@ -328,6 +358,9 @@ export function recordDetection(input: {
     input.ogImage,
     input.redirectedTo,
     input.error,
+    input.outcome,
+    input.blockSignal,
+    input.httpStatus,
   )
 }
 
@@ -395,6 +428,9 @@ export function recordScan(row: Omit<ScanRow, 'scanned_at'> & { scanned_at?: num
     row.nsfw_score,
     row.nsfw_categories,
     row.nsfw_classified_at,
+    row.outcome,
+    row.block_signal,
+    row.http_status,
   )
 }
 

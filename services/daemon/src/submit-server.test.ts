@@ -113,6 +113,9 @@ test('returns recently-scanned for domains scanned within RESCAN_AFTER_MS', () =
     nsfw_classified_at: null,
     redirected_to: null,
     error: null,
+    outcome: 'ok',
+    block_signal: null,
+    http_status: 200,
   }
   const { deps, enqueued } = makeDeps({ getScan: (d) => d === 'roe.dev' ? scan : undefined })
   const r = processSubmit('https://roe.dev', deps)
@@ -142,6 +145,9 @@ test('treats an old scan as not-recent and re-queues', () => {
     nsfw_classified_at: null,
     redirected_to: null,
     error: null,
+    outcome: 'ok',
+    block_signal: null,
+    http_status: 200,
   }
   const { deps, enqueued } = makeDeps({ getScan: () => ancient })
   const r = processSubmit('https://example.com', deps)

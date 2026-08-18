@@ -6,11 +6,20 @@ import { remoteCapture } from './remote.ts'
 import { canonicalDomain } from '../domains.ts'
 import { parse as parseHost } from 'tldts'
 import type { DetectionResult, DetectionSignal } from './detect.ts'
+import type { BlockSignal } from './block.ts'
 import { uploadOgImage } from '../imagekit.ts'
+
+/** How the scan attempt itself went, independent of whether the site is Nuxt.
+ *  `blocked` means a bot-mitigation wall answered instead of the real page, so the
+ *  detection result (and any `is_nuxt = 0`) can't be trusted. */
+export type ScanResultOutcome = 'ok' | 'blocked' | 'error'
 
 export interface ScanOutcome {
   domain: string
   detection: DetectionResult
+  outcome: ScanResultOutcome
+  blockSignal: BlockSignal | null
+  httpStatus: number | null
   finalUrl: string | null
   title: string | null
   /** og:description / twitter:description / <meta name="description">, trimmed. */
@@ -94,6 +103,9 @@ function combine(...resultSignals: DetectionSignal[][]): { signals: DetectionSig
 export interface DetectionOutcome {
   domain: string
   detection: DetectionResult
+  outcome: ScanResultOutcome
+  blockSignal: BlockSignal | null
+  httpStatus: number | null
   finalUrl: string | null
   title: string | null
   description: string | null
@@ -108,6 +120,9 @@ function emptyDetectionOutcome(domain: string, error: string | null): DetectionO
   return {
     domain,
     detection: { isNuxt: false, confidence: 0, nuxtVersion: null, signals: [] },
+    outcome: 'error',
+    blockSignal: null,
+    httpStatus: null,
     finalUrl: null,
     title: null,
     description: null,
@@ -143,6 +158,9 @@ export async function detectDomain(domain: string): Promise<DetectionOutcome> {
     return {
       domain,
       detection: { isNuxt: false, confidence: 0, nuxtVersion: null, signals: [] },
+      outcome: 'ok',
+      blockSignal: null,
+      httpStatus: html.status,
       finalUrl: html.finalUrl,
       title: html.title,
       description: html.description,
@@ -195,9 +213,20 @@ export async function detectDomain(domain: string): Promise<DetectionOutcome> {
     signals,
   }
 
+  // A block wall can't fake Nuxt markers, so a passing detection wins over the block
+  // signal; the signal is still recorded for visibility. A blocked non-hit means we
+  // never saw the real page, so it must not be read as "not Nuxt".
+  const outcome: ScanResultOutcome = html.blockSignal && !detection.isNuxt ? 'blocked' : 'ok'
+  if (html.blockSignal) {
+    log.info(`[detect] ${domain} bot mitigation: ${html.blockSignal} (status=${html.status} nuxt=${detection.isNuxt})`)
+  }
+
   return {
     domain,
     detection,
+    outcome,
+    blockSignal: html.blockSignal,
+    httpStatus: html.status,
     finalUrl: html.finalUrl,
     title: html.title,
     description: html.description,

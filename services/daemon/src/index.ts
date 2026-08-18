@@ -17,7 +17,7 @@ import {
   recordReplyRequest,
 } from './store.ts'
 import { startSubmitServer } from './submit-server.ts'
-import { captureForDomain, detectDomain, type DetectionOutcome } from './scan/index.ts'
+import { captureForDomain, detectDomain, type DetectionOutcome, type ScanOutcome } from './scan/index.ts'
 import { dispatchNotifications } from './pipeline.ts'
 import { type CaptureJob, loadQueueState, saveQueueState } from './queue-state.ts'
 import { getSelfDid } from './notify/bluesky-client.ts'
@@ -152,6 +152,9 @@ async function handleDetection({ domain }: DetectionJob): Promise<void> {
       ogImage: outcome.ogImage,
       redirectedTo: outcome.redirectedTo,
       error: outcome.error,
+      outcome: outcome.outcome,
+      blockSignal: outcome.blockSignal,
+      httpStatus: outcome.httpStatus,
     })
 
     if (outcome.redirectedTo && outcome.redirectedTo !== domain) {
@@ -225,6 +228,9 @@ async function handleCapture(job: CaptureJob): Promise<void> {
         nuxtVersion: stored.nuxt_version,
         signals: parseSignals(stored.signals),
       },
+      outcome: stored.outcome,
+      blockSignal: stored.block_signal as ScanOutcome['blockSignal'],
+      httpStatus: stored.http_status,
       finalUrl: stored.final_url,
       title: stored.title,
       description: null,
