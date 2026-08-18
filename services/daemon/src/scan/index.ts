@@ -143,7 +143,14 @@ function emptyDetectionOutcome(domain: string, error: string | null): DetectionO
  * chunk JS grep. Returns enough state for the caller to persist the detection row and
  * decide whether to enqueue capture. No image work happens here.
  */
-export async function detectDomain(domain: string): Promise<DetectionOutcome> {
+export interface DetectOptions {
+  /** Widen the version hunt on a confirmed hit from one entry chunk to the full set.
+   *  Version sniffing is lossy (a single chunk fetch that times out yields null), which
+   *  matters for a refresh sweep where null would otherwise overwrite a known version. */
+  deepVersionScan?: boolean
+}
+
+export async function detectDomain(domain: string, options: DetectOptions = {}): Promise<DetectionOutcome> {
   const url = `https://${domain}/`
 
   let html: Awaited<ReturnType<typeof scanHtml>>
@@ -207,7 +214,7 @@ export async function detectDomain(domain: string): Promise<DetectionOutcome> {
   // Confirmed Nuxt but no version yet: one extra JS fetch to find it. Bounded to the ~2%
   // of scans that pass the threshold.
   if (confidence >= CONFIDENCE_THRESHOLD && !nuxtVersion) {
-    const js = await scanReferencedJs(html.html, html.finalUrl, { limit: 1 })
+    const js = await scanReferencedJs(html.html, html.finalUrl, options.deepVersionScan ? {} : { limit: 1 })
     if (js.nuxtVersion) {
       nuxtVersion = js.nuxtVersion
       log.debug(`[detect] ${domain} version from entry chunk: ${nuxtVersion}`)

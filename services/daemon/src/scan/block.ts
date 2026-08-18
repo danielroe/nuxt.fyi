@@ -27,11 +27,15 @@ const BLOCK_STATUSES: Record<number, BlockSignal> = {
 }
 
 export function detectBlock(status: number, headers: Headers, html: string): BlockSignal | null {
+  // `/cdn-cgi/challenge-platform/` alone is not a block: Cloudflare injects its JS
+  // Detections script into ordinary 200 responses, so matching it on a real page would
+  // flag every CF-fronted site. Only the interstitial itself counts, identified by the
+  // authoritative header, the challenge form token, or the interstitial title.
   if (
     headers.get('cf-mitigated') === 'challenge'
-    || html.includes('/cdn-cgi/challenge-platform/')
     || html.includes('__cf_chl_')
     || /<title[^>]*>\s*(?:just a moment|attention required!\s*\|\s*cloudflare)/i.test(html)
+    || (status !== 200 && html.includes('/cdn-cgi/challenge-platform/'))
   ) {
     return 'cloudflare-challenge'
   }

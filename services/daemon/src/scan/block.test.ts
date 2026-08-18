@@ -21,6 +21,16 @@ test('cloudflare challenge via interstitial markup', () => {
   assert.equal(detectBlock(403, empty, html), 'cloudflare-challenge')
 })
 
+test('cloudflare JS Detections script on a real 200 page is not a block', () => {
+  const html = `
+    <html><head><title>Real Site</title></head><body>
+      <div id="__nuxt">content</div>
+      <script src="/cdn-cgi/challenge-platform/h/g/scripts/jsd/main.js"></script>
+    </body></html>
+  `
+  assert.equal(detectBlock(200, empty, html), null)
+})
+
 test('cloudflare "Attention Required" IP block page', () => {
   assert.equal(detectBlock(403, empty, '<title>Attention Required! | Cloudflare</title>'), 'cloudflare-challenge')
 })

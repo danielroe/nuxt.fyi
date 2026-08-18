@@ -6,9 +6,13 @@
  * shares the daemon's SQLite database WAL-safely.
  *
  * Every attempt is appended to `version_checks` (including blocked and errored ones) so
- * adoption is chartable over time. The `scans` row is only overwritten when the fetch
- * produced a trustworthy result (`outcome = 'ok'`): a challenge wall or a network error
- * must not flip a confirmed hit to is_nuxt = 0.
+ * adoption is chartable over time. Writes to `scans` are deliberately conservative,
+ * because a sweep that trusts a single observation degrades the corpus:
+ *   - only `outcome = 'ok'` results are persisted at all;
+ *   - a version that couldn't be re-detected keeps its previous value (absence of
+ *     evidence: chunk fetches time out and version sniffing is best-effort);
+ *   - a confirmed hit that now reads as non-Nuxt is reported but not written unless
+ *     --allow-downgrade, since a soft wall looks identical to a genuine migration.
  */
 import { parseArgs } from 'node:util'
 import { log } from '../log.ts'
@@ -24,6 +28,7 @@ Re-runs cheap detection over the corpus to refresh nuxt_version data.
   --errored       refresh only domains whose last scan errored (combinable with --blocked)
   --concurrency   parallel detections (default 8)
   --limit         stop after N domains (for trial runs)
+  --allow-downgrade  persist hits that now look non-Nuxt (default: report only)
   --dry-run       detect and report, but write nothing
   --verbose       per-domain logging`
 
@@ -40,6 +45,7 @@ const { values } = parseArgs({
     'errored': { type: 'boolean', default: false },
     'concurrency': { type: 'string', default: '8' },
     'limit': { type: 'string' },
+    'allow-downgrade': { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', default: false },
     'verbose': { type: 'boolean', short: 'v', default: false },
     'help': { type: 'boolean', short: 'h', default: false },
@@ -64,13 +70,17 @@ const candidates = listRefreshCandidates({ nuxtOnly: !values.all, blockedOnly: v
 
 log.info(`[refresh] ${candidates.length} domain(s) to check (concurrency=${concurrency}${values['dry-run'] ? ', dry-run' : ''})`)
 
-const counts = { ok: 0, blocked: 0, error: 0, versionChanged: 0, statusChanged: 0 }
+const counts = { ok: 0, blocked: 0, error: 0, versionChanged: 0, statusChanged: 0, versionHeld: 0, downgradeHeld: 0 }
 const changes: string[] = []
+/** Confirmed hits that came back non-Nuxt. Not written unless --allow-downgrade; worth
+ *  eyeballing since a soft wall and a genuine migration off Nuxt look identical here. */
+const downgrades: string[] = []
 
 async function refresh(candidate: (typeof candidates)[number]): Promise<void> {
   const { domain } = candidate
   try {
-    const outcome = await detectDomain(domain)
+    const wasNuxt = candidate.is_nuxt === 1
+    const outcome = await detectDomain(domain, { deepVersionScan: wasNuxt && !!candidate.nuxt_version })
     if (!values['dry-run']) {
       recordVersionCheck({
         domain,
@@ -87,14 +97,29 @@ async function refresh(candidate: (typeof candidates)[number]): Promise<void> {
       return
     }
 
-    const wasNuxt = candidate.is_nuxt === 1
-    const versionChanged = outcome.detection.nuxtVersion !== candidate.nuxt_version
-    const statusChanged = outcome.detection.isNuxt !== wasNuxt
-    if (versionChanged) counts.versionChanged++
-    if (statusChanged) counts.statusChanged++
-    if (versionChanged || statusChanged) {
-      const before = wasNuxt ? candidate.nuxt_version ?? 'unknown' : 'not-nuxt'
-      const after = outcome.detection.isNuxt ? outcome.detection.nuxtVersion ?? 'unknown' : 'not-nuxt'
+    if (wasNuxt && !outcome.detection.isNuxt) {
+      const note = `${domain}: was ${candidate.nuxt_version ?? 'nuxt (version unknown)'}, now reads as not-nuxt`
+      downgrades.push(note)
+      if (!values['allow-downgrade']) {
+        counts.downgradeHeld++
+        log.warn(`[refresh] ${note}; holding (pass --allow-downgrade to persist)`)
+        return
+      }
+      counts.statusChanged++
+      log.info(`[refresh] ${note}; persisting`)
+    }
+
+    const nextVersion = outcome.detection.nuxtVersion ?? (outcome.detection.isNuxt ? candidate.nuxt_version : null)
+    if (outcome.detection.isNuxt && !outcome.detection.nuxtVersion && candidate.nuxt_version) {
+      counts.versionHeld++
+      log.debug(`[refresh] ${domain} version not re-detected; keeping ${candidate.nuxt_version}`)
+    }
+
+    const versionChanged = nextVersion !== candidate.nuxt_version
+    if (versionChanged) {
+      counts.versionChanged++
+      const before = candidate.nuxt_version ?? 'unknown'
+      const after = nextVersion ?? 'unknown'
       changes.push(`${domain}: ${before} -> ${after}`)
       log.info(`[refresh] ${domain}: ${before} -> ${after}`)
     }
@@ -106,7 +131,7 @@ async function refresh(candidate: (typeof candidates)[number]): Promise<void> {
       recordDetection({
         domain: outcome.domain,
         isNuxt: outcome.detection.isNuxt,
-        nuxtVersion: outcome.detection.nuxtVersion,
+        nuxtVersion: nextVersion,
         confidence: outcome.detection.confidence,
         signals: JSON.stringify(outcome.detection.signals),
         finalUrl: outcome.finalUrl,
@@ -143,4 +168,5 @@ process.stdout.write(`${JSON.stringify({
   checked: candidates.length,
   ...counts,
   changes,
+  downgrades,
 }, null, 2)}\n`)
