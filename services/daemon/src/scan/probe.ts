@@ -1,6 +1,6 @@
 import type { DetectionSignal } from './detect.ts'
+import { subresourceHeaders, type ProfileName } from './fetch-profile.ts'
 
-const USER_AGENT = 'Mozilla/5.0 (compatible; NuxtFyi/0.1; +https://nuxt.fyi)'
 const FETCH_TIMEOUT_MS = 6_000
 const MAX_BYTES = 64 * 1024
 
@@ -10,14 +10,14 @@ export interface ProbeResult {
   buildId: string | null
 }
 
-async function tryJson(url: string): Promise<{ status: number, body: string } | null> {
+async function tryJson(url: string, profile: ProfileName): Promise<{ status: number, body: string } | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
     const res = await fetch(url, {
       redirect: 'follow',
       signal: controller.signal,
-      headers: { 'user-agent': USER_AGENT, 'accept': 'application/json,*/*' },
+      headers: subresourceHeaders(profile, 'application/json,*/*'),
     })
     if (!res.body) return { status: res.status, body: '' }
     const reader = res.body.getReader()
@@ -49,7 +49,13 @@ function looksLikeJson(body: string): unknown | null {
   }
 }
 
-export async function probeNuxtEndpoints(finalUrl: string): Promise<ProbeResult> {
+/**
+ * Probes Nuxt-specific static endpoints. Worth running even when the HTML came back as
+ * a challenge page: bot walls generally protect document routes, while `/_nuxt/*` is
+ * served as a static asset, so these probes frequently identify a Nuxt site we were
+ * otherwise refused. `/_nuxt/builds/latest.json` alone clears the detection threshold.
+ */
+export async function probeNuxtEndpoints(finalUrl: string, profile: ProfileName = 'polite'): Promise<ProbeResult> {
   let origin: string
   try {
     origin = new URL(finalUrl).origin
@@ -62,8 +68,8 @@ export async function probeNuxtEndpoints(finalUrl: string): Promise<ProbeResult>
   let buildId: string | null = null
 
   const [latestRes, payloadRes] = await Promise.all([
-    tryJson(`${origin}/_nuxt/builds/latest.json`),
-    tryJson(new URL('_payload.json', finalUrl.endsWith('/') ? finalUrl : `${finalUrl}/`).toString()),
+    tryJson(`${origin}/_nuxt/builds/latest.json`, profile),
+    tryJson(new URL('_payload.json', finalUrl.endsWith('/') ? finalUrl : `${finalUrl}/`).toString(), profile),
   ])
 
   // Nuxt 3 ships `{ id: "<hash>", timestamp: <number> }`. Requiring both fields filters out
@@ -73,6 +79,24 @@ export async function probeNuxtEndpoints(finalUrl: string): Promise<ProbeResult>
     if (parsed && typeof parsed.id === 'string' && typeof parsed.timestamp === 'number') {
       signals.push({ name: 'probe: /_nuxt/builds/latest.json', weight: 6, detail: parsed.id })
       buildId = parsed.id
+    }
+  }
+
+  // The per-build meta document sometimes carries the generating Nuxt version.
+  if (buildId) {
+    const metaRes = await tryJson(`${origin}/_nuxt/builds/meta/${buildId}.json`, profile)
+    if (metaRes && metaRes.status === 200) {
+      const meta = looksLikeJson(metaRes.body) as Record<string, unknown> | null
+      if (meta) {
+        signals.push({ name: 'probe: /_nuxt/builds/meta', weight: 3 })
+        const candidate = typeof meta.nuxt === 'string'
+          ? meta.nuxt
+          : typeof (meta.versions as { nuxt?: unknown } | undefined)?.nuxt === 'string'
+            ? (meta.versions as { nuxt: string }).nuxt
+            : null
+        const match = candidate?.match(/^v?(\d+\.\d+\.\d+)$/)
+        if (match && Number(match[1]!.split('.')[0]) >= 2) nuxtVersion = match[1]!
+      }
     }
   }
 

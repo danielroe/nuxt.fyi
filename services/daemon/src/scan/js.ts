@@ -1,9 +1,14 @@
 import type { DetectionSignal } from './detect.ts'
 
-const USER_AGENT = 'Mozilla/5.0 (compatible; NuxtFyi/0.1; +https://nuxt.fyi)'
+import { subresourceHeaders, type ProfileName } from './fetch-profile.ts'
+
 const FETCH_TIMEOUT_MS = 10_000
 const MAX_BYTES_PER_CHUNK = 1.5 * 1024 * 1024
 const MAX_CHUNKS = 3
+/** Version hunting walks chunks one at a time and stops at the first hit, so a deeper
+ *  cap costs nothing on the common case and rescues the sites whose version lives in a
+ *  later chunk (or whose first chunk fetch timed out). */
+const MAX_VERSION_CHUNKS = 8
 
 const SCRIPT_SRC_RE = /<script[^>]+src=["']([^"']+)["']/gi
 const MODULEPRELOAD_RE = /<link[^>]+rel=["']modulepreload["'][^>]+href=["']([^"']+)["']/gi
@@ -87,14 +92,14 @@ export function pickEntryChunks(html: string, pageUrl: string, limit = MAX_CHUNK
     .map(c => c.url)
 }
 
-async function fetchChunk(url: string): Promise<string | null> {
+async function fetchChunk(url: string, profile: ProfileName = 'polite'): Promise<string | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
     const res = await fetch(url, {
       redirect: 'follow',
       signal: controller.signal,
-      headers: { 'user-agent': USER_AGENT, 'accept': '*/*' },
+      headers: subresourceHeaders(profile, '*/*'),
     })
     if (!res.ok || !res.body) return null
     const reader = res.body.getReader()
@@ -131,6 +136,9 @@ export function scanJsText(text: string): { signals: DetectionSignal[], nuxtVers
     new RegExp(String.raw`(?:^|[\s,{;])(?:_{0,2}NUXT_VERSION_{0,2})\s*[:=]\s*${Q}v?(\d+\.\d+\.\d+)`, 'i'),
     new RegExp(String.raw`${Q}nuxt${Q}\s*:\s*${Q}v?(\d+\.\d+\.\d+)`, 'i'),
     new RegExp(String.raw`\bversions\s*:\s*\{[^}]*?\bnuxt\s*:\s*${Q}v?(\d+\.\d+\.\d+)`, 'i'),
+    // Bundled banner/spec strings, e.g. `nuxt@3.14.159` in a build comment or import map.
+    new RegExp(String.raw`\bnuxt@(\d+\.\d+\.\d+)`, 'i'),
+    new RegExp(String.raw`\bnuxtVersion\s*[:=]\s*${Q}v?(\d+\.\d+\.\d+)`, 'i'),
   ]
   let nuxtVersion: string | null = null
   for (const re of candidates) {
@@ -146,13 +154,33 @@ export function scanJsText(text: string): { signals: DetectionSignal[], nuxtVers
 export interface ScanJsOptions {
   /** Maximum number of entry chunks to fetch (default 3). */
   limit?: number
+  /** Header profile for the chunk requests; match whatever the document fetch used. */
+  profile?: ProfileName
+}
+
+/**
+ * Version-only pass: fetches candidate chunks sequentially and returns as soon as a
+ * version is found. Signals are ignored, so unlike `scanReferencedJs` this never pays
+ * for chunks it doesn't need, which is what makes the deeper cap affordable.
+ */
+export async function huntNuxtVersion(html: string, pageUrl: string, options: ScanJsOptions = {}): Promise<{ nuxtVersion: string | null, fetched: number }> {
+  const chunkUrls = pickEntryChunks(html, pageUrl, options.limit ?? MAX_VERSION_CHUNKS)
+  let fetched = 0
+  for (const url of chunkUrls) {
+    const text = await fetchChunk(url, options.profile ?? 'polite')
+    if (!text) continue
+    fetched++
+    const { nuxtVersion } = scanJsText(text)
+    if (nuxtVersion) return { nuxtVersion, fetched }
+  }
+  return { nuxtVersion: null, fetched }
 }
 
 export async function scanReferencedJs(html: string, pageUrl: string, options: ScanJsOptions = {}): Promise<JsScanResult> {
   const chunkUrls = pickEntryChunks(html, pageUrl, options.limit ?? MAX_CHUNKS)
   if (chunkUrls.length === 0) return { signals: [], fetched: 0, nuxtVersion: null }
 
-  const results = await Promise.all(chunkUrls.map(fetchChunk))
+  const results = await Promise.all(chunkUrls.map(u => fetchChunk(u, options.profile ?? 'polite')))
   const allSignalNames = new Set<string>()
   const signals: DetectionSignal[] = []
   let nuxtVersion: string | null = null

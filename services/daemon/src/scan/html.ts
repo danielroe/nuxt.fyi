@@ -1,6 +1,7 @@
 import { detectFromHtml, type DetectionResult } from './detect.ts'
 import { detectBlock, type BlockSignal } from './block.ts'
 import { detectHosting, type HostingResult } from './hosting.ts'
+import { documentHeaders, type ProfileName } from './fetch-profile.ts'
 
 export interface HtmlScanResult {
   detection: DetectionResult
@@ -15,6 +16,9 @@ export interface HtmlScanResult {
   blockSignal: BlockSignal | null
   /** Hosting platform + fronting CDN detected from response headers. */
   hosting: HostingResult
+  /** Which header profile produced this result. 'browser' means the polite pass was
+   *  refused and we retried; downstream subresource fetches should match it. */
+  profile: ProfileName
   html: string
 }
 
@@ -56,22 +60,22 @@ function resolveHttpUrl(raw: string, baseUrl: string): string | null {
   catch { return null }
 }
 
-const USER_AGENT = 'Mozilla/5.0 (compatible; NuxtFyi/0.1; +https://nuxt.fyi)'
 const FETCH_TIMEOUT_MS = 15_000
 const MAX_BYTES = 2 * 1024 * 1024
 
-export async function scanHtml(url: string): Promise<HtmlScanResult> {
+interface RawFetch {
+  res: Response
+  html: string
+}
+
+async function fetchDocument(url: string, profile: ProfileName): Promise<RawFetch> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
     const res = await fetch(url, {
       redirect: 'follow',
       signal: controller.signal,
-      headers: {
-        'user-agent': USER_AGENT,
-        'accept': 'text/html,application/xhtml+xml',
-        'accept-language': 'en',
-      },
+      headers: documentHeaders(profile),
     })
 
     const reader = res.body?.getReader()
@@ -87,29 +91,50 @@ export async function scanHtml(url: string): Promise<HtmlScanResult> {
       }
       try { await reader.cancel() } catch { /* noop */ }
     }
-
-    // og:title is the site's own framing; fall back to <title>. og:description likewise
-    // falls back to <meta name="description">. We prefer og:* because those values are
-    // explicitly chosen for social embeds.
-    const titleTag = html.match(/<title[^>]*>([^<]{0,300})<\/title>/i)?.[1]?.trim() ?? null
-    const title = firstMeta(html, ['og:title', 'twitter:title']) ?? titleTag
-    const description = firstMeta(html, ['og:description', 'twitter:description', 'description'])
-    const detection = detectFromHtml(html, res.headers)
-    const ogImageRaw = firstMeta(html, ['og:image:secure_url', 'og:image', 'twitter:image'])
-    const ogImage = ogImageRaw ? resolveHttpUrl(ogImageRaw, res.url) : null
-
-    return {
-      detection,
-      finalUrl: res.url,
-      title,
-      description,
-      ogImage,
-      status: res.status,
-      blockSignal: detectBlock(res.status, res.headers, html),
-      hosting: detectHosting(res.headers),
-      html,
-    }
-  } finally {
+    return { res, html }
+  }
+  finally {
     clearTimeout(timer)
+  }
+}
+
+export async function scanHtml(url: string): Promise<HtmlScanResult> {
+  let profile: ProfileName = 'polite'
+  let { res, html } = await fetchDocument(url, profile)
+
+  // One retry as a browser when the polite pass is refused. If the retry is also
+  // blocked we keep its result: the block signal from a browser-shaped request is the
+  // more meaningful one to record.
+  if (detectBlock(res.status, res.headers, html)) {
+    profile = 'browser'
+    try {
+      ({ res, html } = await fetchDocument(url, profile))
+    }
+    catch {
+      profile = 'polite'
+    }
+  }
+
+  // og:title is the site's own framing; fall back to <title>. og:description likewise
+  // falls back to <meta name="description">. We prefer og:* because those values are
+  // explicitly chosen for social embeds.
+  const titleTag = html.match(/<title[^>]*>([^<]{0,300})<\/title>/i)?.[1]?.trim() ?? null
+  const title = firstMeta(html, ['og:title', 'twitter:title']) ?? titleTag
+  const description = firstMeta(html, ['og:description', 'twitter:description', 'description'])
+  const detection = detectFromHtml(html, res.headers)
+  const ogImageRaw = firstMeta(html, ['og:image:secure_url', 'og:image', 'twitter:image'])
+  const ogImage = ogImageRaw ? resolveHttpUrl(ogImageRaw, res.url) : null
+
+  return {
+    detection,
+    finalUrl: res.url,
+    title,
+    description,
+    ogImage,
+    status: res.status,
+    blockSignal: detectBlock(res.status, res.headers, html),
+    hosting: detectHosting(res.headers),
+    profile,
+    html,
   }
 }

@@ -100,3 +100,23 @@ test('scanJsText does not false-positive on plain React/Next code', () => {
   const r = scanJsText(text)
   assert.deepEqual(r.signals, [])
 })
+
+test('scanJsText extracts a version from a bundled package spec', () => {
+  const r = scanJsText(`//# sourceURL=/node_modules/.pnpm/nuxt@3.14.159/dist/app/entry.js`)
+  assert.equal(r.nuxtVersion, '3.14.159')
+})
+
+test('scanJsText does NOT read a sibling package spec as Nuxt core', () => {
+  const samples = [
+    `/node_modules/.pnpm/@nuxt+kit@3.14.1/dist/index.mjs`,
+    `/node_modules/.pnpm/@nuxtjs+i18n@10.2.3/dist/runtime.mjs`,
+    `/node_modules/.pnpm/nuxt-site-config@3.2.2/dist/index.mjs`,
+  ]
+  for (const s of samples) {
+    assert.equal(scanJsText(s).nuxtVersion, null, s)
+  }
+})
+
+test('scanJsText extracts the nuxtVersion assignment shape', () => {
+  assert.equal(scanJsText(`const nuxtVersion="4.1.2";`).nuxtVersion, '4.1.2')
+})

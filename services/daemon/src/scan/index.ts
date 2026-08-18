@@ -1,7 +1,7 @@
 import { log } from '../log.ts'
 import { scanHtml } from './html.ts'
 import { probeNuxtEndpoints } from './probe.ts'
-import { scanReferencedJs } from './js.ts'
+import { huntNuxtVersion, scanReferencedJs } from './js.ts'
 import { remoteCapture } from './remote.ts'
 import { canonicalDomain } from '../domains.ts'
 import { parse as parseHost } from 'tldts'
@@ -191,18 +191,21 @@ export async function detectDomain(domain: string, options: DetectOptions = {}):
   let nuxtVersion = html.detection.nuxtVersion
   let signals = [...html.detection.signals]
 
-  if (html.detection.confidence < CONFIDENCE_THRESHOLD || !nuxtVersion) {
-    const probe = await probeNuxtEndpoints(html.finalUrl)
+  // Also probe when the document was walled: the HTML we have is a challenge page, but
+  // `/_nuxt/*` is usually served straight past the wall.
+  if (html.detection.confidence < CONFIDENCE_THRESHOLD || !nuxtVersion || html.blockSignal) {
+    const probe = await probeNuxtEndpoints(html.finalUrl, html.profile)
     if (probe.signals.length > 0) {
       log.debug(`[detect] ${domain} probe hits: ${probe.signals.map(s => s.name).join(', ')}`)
     }
     signals = combine(signals, probe.signals).signals
+    if (!nuxtVersion && probe.nuxtVersion) nuxtVersion = probe.nuxtVersion
   }
 
   let confidence = signals.reduce((sum, s) => sum + s.weight, 0)
 
   if (confidence < CONFIDENCE_THRESHOLD) {
-    const js = await scanReferencedJs(html.html, html.finalUrl)
+    const js = await scanReferencedJs(html.html, html.finalUrl, { profile: html.profile })
     if (js.signals.length > 0) {
       log.debug(`[detect] ${domain} js hits (${js.fetched} chunks): ${js.signals.map(s => s.name).join(', ')}`)
     }
@@ -211,13 +214,17 @@ export async function detectDomain(domain: string, options: DetectOptions = {}):
     confidence = signals.reduce((sum, s) => sum + s.weight, 0)
   }
 
-  // Confirmed Nuxt but no version yet: one extra JS fetch to find it. Bounded to the ~2%
-  // of scans that pass the threshold.
+  // Confirmed Nuxt but no version yet. The hunt walks chunks one at a time and stops at
+  // the first hit, so it's bounded by how quickly the version turns up rather than by a
+  // fixed fetch budget. Bounded to the ~2% of scans that pass the threshold.
   if (confidence >= CONFIDENCE_THRESHOLD && !nuxtVersion) {
-    const js = await scanReferencedJs(html.html, html.finalUrl, options.deepVersionScan ? {} : { limit: 1 })
-    if (js.nuxtVersion) {
-      nuxtVersion = js.nuxtVersion
-      log.debug(`[detect] ${domain} version from entry chunk: ${nuxtVersion}`)
+    const hunt = await huntNuxtVersion(html.html, html.finalUrl, {
+      profile: html.profile,
+      ...(options.deepVersionScan ? {} : { limit: 2 }),
+    })
+    if (hunt.nuxtVersion) {
+      nuxtVersion = hunt.nuxtVersion
+      log.debug(`[detect] ${domain} version from entry chunk after ${hunt.fetched} fetch(es): ${nuxtVersion}`)
     }
   }
 
@@ -233,7 +240,7 @@ export async function detectDomain(domain: string, options: DetectOptions = {}):
   // never saw the real page, so it must not be read as "not Nuxt".
   const outcome: ScanResultOutcome = html.blockSignal && !detection.isNuxt ? 'blocked' : 'ok'
   if (html.blockSignal) {
-    log.info(`[detect] ${domain} bot mitigation: ${html.blockSignal} (status=${html.status} nuxt=${detection.isNuxt})`)
+    log.info(`[detect] ${domain} bot mitigation: ${html.blockSignal} (status=${html.status} profile=${html.profile} nuxt=${detection.isNuxt})`)
   }
 
   return {
