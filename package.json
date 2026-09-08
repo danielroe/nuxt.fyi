@@ -6,7 +6,18 @@
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@12.3.4",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^24.0.0",
+      "onFail": "download"
+    },
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.3.4",
+      "onFail": "download"
+    }
+  },
   "scripts": {
     "start": "pnpm --filter @nuxt-fyi/daemon start",
     "dev": "pnpm --filter @nuxt-fyi/daemon dev",
