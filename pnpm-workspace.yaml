@@ -15,5 +15,3 @@ minimumReleaseAgeExclude:
   - '@nuxt/schema-nightly@5.0.0-29748311.884bca56'
   - '@nuxt/vite-builder-nightly@5.0.0-29748311.884bca56'
   - nuxt-nightly@5.0.0-29748311.884bca56
-patchedDependencies:
-  nitro@3.0.260610-beta: patches/nitro@3.0.260610-beta.patch
