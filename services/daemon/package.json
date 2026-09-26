@@ -23,13 +23,13 @@
     "backfill-nsfw": "node --env-file-if-exists=../../.env scripts/backfill-nsfw.mjs"
   },
   "dependencies": {
-    "@atproto/api": "^0.20.6",
+    "@atproto/api": "^0.21.0",
     "@imagekit/nodejs": "^7.6.2",
     "consola": "^3.4.0",
     "tldts": "^7.0.0"
   },
   "devDependencies": {
-    "@types/node": "24.13.3",
+    "@types/node": "24.13.6",
     "typescript": "6.0.3"
   }
 }
