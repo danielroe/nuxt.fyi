@@ -2,7 +2,7 @@
 interface VersionRow {
   version: string
   count: number
-  bucket?: 'published' | 'off-registry' | 'unknown'
+  bucket?: 'published' | 'nightly' | 'off-registry' | 'unknown'
 }
 
 const props = defineProps<{
@@ -15,6 +15,7 @@ interface MinorBucket {
   minor: number
   count: number
   isUnknown: boolean
+  isNightly: boolean
 }
 
 function bucketByMinor(versions: VersionRow[]): MinorBucket[] {
@@ -28,14 +29,16 @@ function bucketByMinor(versions: VersionRow[]): MinorBucket[] {
         minor: Number.POSITIVE_INFINITY,
         count: (existing?.count ?? 0) + row.count,
         isUnknown: true,
+        isNightly: false,
       })
       continue
     }
     const parts = row.version.split('.')
     const major = Number(parts[0])
-    const minor = Number(parts[1] ?? 0)
     if (!Number.isFinite(major)) continue
-    const key = `${major}.${minor}`
+    const isNightly = row.bucket === 'nightly'
+    const minor = isNightly ? 0 : Number(parts[1] ?? 0)
+    const key = isNightly ? `${major}.x nightly` : `${major}.${minor}`
     const existing = map.get(key)
     map.set(key, {
       label: key,
@@ -43,6 +46,7 @@ function bucketByMinor(versions: VersionRow[]): MinorBucket[] {
       minor,
       count: (existing?.count ?? 0) + row.count,
       isUnknown: false,
+      isNightly,
     })
   }
   return [...map.values()].sort((a, b) => {
@@ -54,7 +58,7 @@ function bucketByMinor(versions: VersionRow[]): MinorBucket[] {
 }
 
 const buckets = computed(() =>
-  bucketByMinor(props.versions.filter(v => v.bucket === 'published')),
+  bucketByMinor(props.versions.filter(v => v.bucket === 'published' || v.bucket === 'nightly')),
 )
 
 const WIDTH = 720
@@ -62,6 +66,25 @@ const HEIGHT = 360
 const PADDING = { top: 18, right: 12, bottom: 56, left: 44 }
 const BAR_GAP = 4
 const MAJOR_GAP = 18
+
+/** End-of-life majors are drawn with narrower bars and sparser minor labels. */
+const EOL_MAJORS = new Set([2, 3])
+const EOL_BAR_WEIGHT = 0.35
+const EOL_BAR_GAP = 2
+const EOL_LABEL_EVERY = 5
+const NIGHTLY_LABEL = 'nightly'
+const LABEL_CHAR_WIDTH = 6.6
+
+function isCompact(b: MinorBucket): boolean {
+  return !b.isUnknown && EOL_MAJORS.has(b.major)
+}
+
+function minorLabel(b: MinorBucket, width: number): string {
+  if (b.isUnknown) return '?'
+  if (b.isNightly) return width >= NIGHTLY_LABEL.length * LABEL_CHAR_WIDTH ? NIGHTLY_LABEL : ''
+  if (isCompact(b) && b.minor % EOL_LABEL_EVERY !== 0) return ''
+  return String(b.minor)
+}
 
 /**
  * Round `max` up to a friendly axis ceiling (1, 2, 2.5, 5 * 10^n) so tick labels read
@@ -117,9 +140,10 @@ const layout = computed(() => {
     const prev = items[i - 1]!
     const cur = items[i]!
     const sameGroup = prev.isUnknown === cur.isUnknown && prev.major === cur.major
-    return sum + (sameGroup ? BAR_GAP : 0)
+    return sum + (sameGroup ? (isCompact(cur) ? EOL_BAR_GAP : BAR_GAP) : 0)
   }, 0)
-  const barW = n > 0 ? (plotW - totalGaps - totalBarGaps) / n : 0
+  const totalWeight = items.reduce((sum, b) => sum + (isCompact(b) ? EOL_BAR_WEIGHT : 1), 0)
+  const unitW = n > 0 ? (plotW - totalGaps - totalBarGaps) / totalWeight : 0
 
   const bars = [] as Array<MinorBucket & {
     x: number
@@ -131,9 +155,18 @@ const layout = computed(() => {
     minorLabel: string
   }>
   let cursor = PADDING.left
+  let prevEnd = cursor
   const groups: MajorGroup[] = []
   let groupStart = cursor
   let groupKey: number | 'unknown' | null = null
+  const pushGroup = (key: number | 'unknown') => groups.push({
+    major: key,
+    label: key === 'unknown' ? 'unknown' : `${key}.x`,
+    start: groupStart,
+    end: prevEnd,
+    cx: (groupStart + prevEnd) / 2,
+    count: majorCounts.get(key) ?? 0,
+  })
   for (let i = 0; i < items.length; i++) {
     const b = items[i]!
     const key: number | 'unknown' = b.isUnknown ? 'unknown' : b.major
@@ -141,41 +174,28 @@ const layout = computed(() => {
       groupKey = key
       groupStart = cursor
     } else if (key !== groupKey) {
-      groups.push({
-        major: groupKey,
-        label: groupKey === 'unknown' ? 'unknown' : `${groupKey}.x`,
-        start: groupStart,
-        end: cursor - BAR_GAP,
-        cx: (groupStart + (cursor - BAR_GAP)) / 2,
-        count: majorCounts.get(groupKey) ?? 0,
-      })
-      cursor += MAJOR_GAP - BAR_GAP
+      pushGroup(groupKey)
+      cursor = prevEnd + MAJOR_GAP
       groupKey = key
       groupStart = cursor
+    } else {
+      cursor = prevEnd + (isCompact(b) ? EOL_BAR_GAP : BAR_GAP)
     }
+    const w = unitW * (isCompact(b) ? EOL_BAR_WEIGHT : 1)
     const h = yMax > 0 ? (b.count / yMax) * plotH : 0
     bars.push({
       ...b,
       x: cursor,
       y: PADDING.top + plotH - h,
-      w: barW,
+      w,
       h,
-      cx: cursor + barW / 2,
+      cx: cursor + w / 2,
       labelY: HEIGHT - PADDING.bottom + 14,
-      minorLabel: b.isUnknown ? '?' : String(b.minor),
+      minorLabel: minorLabel(b, w),
     })
-    cursor += barW + BAR_GAP
+    prevEnd = cursor + w
   }
-  if (groupKey !== null) {
-    groups.push({
-      major: groupKey,
-      label: groupKey === 'unknown' ? 'unknown' : `${groupKey}.x`,
-      start: groupStart,
-      end: cursor - BAR_GAP,
-      cx: (groupStart + (cursor - BAR_GAP)) / 2,
-      count: majorCounts.get(groupKey) ?? 0,
-    })
-  }
+  if (groupKey !== null) pushGroup(groupKey)
 
   return {
     bars,
@@ -240,7 +260,7 @@ const layout = computed(() => {
       />
       <g class="x-axis minor">
         <text
-          v-for="b in layout.bars"
+          v-for="b in layout.bars.filter(b => b.minorLabel)"
           :key="`x-${b.label}`"
           :x="b.cx"
           :y="b.labelY"

@@ -2,7 +2,7 @@
  * Response shapes for the API endpoints served from `server/api/`
  */
 
-export type VersionBucket = 'published' | 'off-registry' | 'unknown'
+export type VersionBucket = 'published' | 'nightly' | 'off-registry' | 'unknown'
 export type NsfwLabel = 'safe' | 'suggestive' | 'nsfw'
 
 export interface ImageSources {

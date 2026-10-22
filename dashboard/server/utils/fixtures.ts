@@ -30,6 +30,10 @@ const publishedVersions: Array<[string, number]> = [
   ['2.16.3', 31],
 ]
 
+const nightlyVersions: Array<[string, number]> = [
+  ['5.0.0', 23],
+]
+
 const offRegistryVersions: Array<[string, number]> = [
   ['3.99.0', 4],
   ['0.0.0-28934765.abcd', 2],
@@ -41,6 +45,7 @@ const unknownVersions: Array<[string, number]> = [
 
 const versions: VersionRow[] = [
   ...publishedVersions.map(([version, count]): VersionRow => ({ version, count, bucket: 'published' })),
+  ...nightlyVersions.map(([version, count]): VersionRow => ({ version, count, bucket: 'nightly' })),
   ...offRegistryVersions.map(([version, count]): VersionRow => ({ version, count, bucket: 'off-registry' })),
   ...unknownVersions.map(([version, count]): VersionRow => ({ version, count, bucket: 'unknown' })),
 ]
