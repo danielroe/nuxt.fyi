@@ -6,15 +6,6 @@ import { getPublishedNuxtVersions } from '../utils/nuxt-versions'
 
 interface CountRow { c: number }
 
-function latestStableMajor(versions: Set<string>): number {
-  let max = 0
-  for (const v of versions) {
-    if (v.includes('-')) continue
-    max = Math.max(max, Number(v.split('.')[0]) || 0)
-  }
-  return max
-}
-
 export default defineEventHandler((): StatsResponse => {
   if (process.env.NUXT_FIXTURES) return fixtureStats
   const db = getDb()
@@ -41,21 +32,18 @@ export default defineEventHandler((): StatsResponse => {
     GROUP BY version ORDER BY count DESC
   `).all() as unknown as Array<{ version: string, count: number }>
 
-  // Versions split into four buckets used by the dashboard's chart vs. sidebar:
+  // Versions split into three buckets used by the dashboard's chart vs. sidebar:
   //   'published'    - found in npm's nuxt registry
-  //   'nightly'      - the next unreleased major, only available from nuxt-nightly
   //   'off-registry' - semver-shaped but not in npm (detection leak)
   //   'unknown'      - Nuxt was detected but no version could be sniffed
   // When the registry table is empty (first boot before ingest runs), every detected version
   // falls back to 'published' so the dataset isn't silently mislabelled.
   const haveRegistry = published.size > 0
-  const nightlyMajor = latestStableMajor(published) + 1
   const versions = rawVersions.map((row) => {
     let bucket: VersionBucket
     if (row.version === 'unknown') bucket = 'unknown'
     else if (!haveRegistry) bucket = 'published'
-    else if (published.has(row.version)) bucket = 'published'
-    else bucket = Number(row.version.split('.')[0]) === nightlyMajor ? 'nightly' : 'off-registry'
+    else bucket = published.has(row.version) ? 'published' : 'off-registry'
     return { ...row, bucket }
   })
 

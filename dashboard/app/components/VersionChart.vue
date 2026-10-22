@@ -2,7 +2,7 @@
 interface VersionRow {
   version: string
   count: number
-  bucket?: 'published' | 'nightly' | 'off-registry' | 'unknown'
+  bucket?: 'published' | 'off-registry' | 'unknown'
 }
 
 const props = defineProps<{
@@ -15,7 +15,6 @@ interface MinorBucket {
   minor: number
   count: number
   isUnknown: boolean
-  isNightly: boolean
 }
 
 function bucketByMinor(versions: VersionRow[]): MinorBucket[] {
@@ -29,16 +28,14 @@ function bucketByMinor(versions: VersionRow[]): MinorBucket[] {
         minor: Number.POSITIVE_INFINITY,
         count: (existing?.count ?? 0) + row.count,
         isUnknown: true,
-        isNightly: false,
       })
       continue
     }
     const parts = row.version.split('.')
     const major = Number(parts[0])
+    const minor = Number(parts[1] ?? 0)
     if (!Number.isFinite(major)) continue
-    const isNightly = row.bucket === 'nightly'
-    const minor = isNightly ? 0 : Number(parts[1] ?? 0)
-    const key = isNightly ? `${major}.x nightly` : `${major}.${minor}`
+    const key = `${major}.${minor}`
     const existing = map.get(key)
     map.set(key, {
       label: key,
@@ -46,7 +43,6 @@ function bucketByMinor(versions: VersionRow[]): MinorBucket[] {
       minor,
       count: (existing?.count ?? 0) + row.count,
       isUnknown: false,
-      isNightly,
     })
   }
   return [...map.values()].sort((a, b) => {
@@ -58,7 +54,7 @@ function bucketByMinor(versions: VersionRow[]): MinorBucket[] {
 }
 
 const buckets = computed(() =>
-  bucketByMinor(props.versions.filter(v => v.bucket === 'published' || v.bucket === 'nightly')),
+  bucketByMinor(props.versions.filter(v => v.bucket === 'published')),
 )
 
 const WIDTH = 720
@@ -72,16 +68,13 @@ const EOL_MAJORS = new Set([2, 3])
 const EOL_BAR_WEIGHT = 0.35
 const EOL_BAR_GAP = 2
 const EOL_LABEL_EVERY = 5
-const NIGHTLY_LABEL = 'nightly'
-const LABEL_CHAR_WIDTH = 6.6
 
 function isCompact(b: MinorBucket): boolean {
   return !b.isUnknown && EOL_MAJORS.has(b.major)
 }
 
-function minorLabel(b: MinorBucket, width: number): string {
+function minorLabel(b: MinorBucket): string {
   if (b.isUnknown) return '?'
-  if (b.isNightly) return width >= NIGHTLY_LABEL.length * LABEL_CHAR_WIDTH ? NIGHTLY_LABEL : ''
   if (isCompact(b) && b.minor % EOL_LABEL_EVERY !== 0) return ''
   return String(b.minor)
 }
@@ -191,7 +184,7 @@ const layout = computed(() => {
       h,
       cx: cursor + w / 2,
       labelY: HEIGHT - PADDING.bottom + 14,
-      minorLabel: minorLabel(b, w),
+      minorLabel: minorLabel(b),
     })
     prevEnd = cursor + w
   }
