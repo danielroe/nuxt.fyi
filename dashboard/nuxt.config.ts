@@ -26,8 +26,6 @@ export default defineNuxtConfig({
   },
   experimental: {
     typedPages: true,
-    // TODO: fix in nuxt/image
-    nitroAutoImports: true,
     defaults: {
       nuxtLink: {
         prefetchOn: { interaction: true },

@@ -1,4 +1,4 @@
-import { defineHandler } from 'nitro/h3'
+import { defineEventHandler } from 'nuxt/server'
 import type { StatsResponse, VersionBucket } from '#shared/api'
 import { getDb } from '../utils/db'
 import { fixtureStats } from '../utils/fixtures'
@@ -6,7 +6,7 @@ import { getPublishedNuxtVersions } from '../utils/nuxt-versions'
 
 interface CountRow { c: number }
 
-export default defineHandler((): StatsResponse => {
+export default defineEventHandler((): StatsResponse => {
   if (process.env.NUXT_FIXTURES) return fixtureStats
   const db = getDb()
   const c = (sql: string): number => (db.prepare(sql).get() as unknown as CountRow).c

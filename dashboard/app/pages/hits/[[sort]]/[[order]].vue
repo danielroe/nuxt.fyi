@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
-import type { APIResponse } from '#shared/api'
+import type { HitsResponse } from '#shared/api'
 import { sanitizeSearchTerm } from '#shared/utils/search-term'
 
 const SORTS = ['scanned_at', 'rank', 'seen_count', 'confidence'] as const
@@ -48,15 +48,13 @@ useHead({
 // unfiltered list. Keeping `q` out of the universal fetch means SSR and the first client
 // render produce identical markup, so hydration matches; it also keeps `/hits?q=…` from
 // being a crawlable, indexable surface or a cache-cardinality vector on the server.
-const { data, pending } = await useFetch<APIResponse<'/api/hits'>>('/api/hits', {
+const { data, pending } = await useFetch('/api/hits', {
   query: computed(() => ({ page: page.value, version: version.value, sort: sort.value, order: order.value })),
   lazy: true,
 })
 
-type HitsData = APIResponse<'/api/hits'>
-
 // Filtered results are fetched separately, client-only, and override `data` when present.
-const filtered = ref<HitsData | null>(null)
+const filtered = ref<HitsResponse | null>(null)
 const searchPending = ref(false)
 let searchAbort: AbortController | null = null
 
@@ -73,7 +71,7 @@ onMounted(() => {
     searchAbort = new AbortController()
     searchPending.value = true
     try {
-      filtered.value = await $fetch<HitsData>('/api/hits', {
+      filtered.value = await $fetch('/api/hits', {
         query: { page: p, version: v, sort: s, order: o, q },
         signal: searchAbort.signal,
       })

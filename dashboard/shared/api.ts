@@ -2,9 +2,6 @@
  * Response shapes for the API endpoints served from `server/api/`
  */
 
-import type { DynamicParam, Endpoint, TypedFetchInput, TypedFetchRequestInit, TypedFetchResponseBody } from 'fetchdts'
-import { $fetch } from 'ofetch'
-
 export type VersionBucket = 'published' | 'off-registry' | 'unknown'
 export type NsfwLabel = 'safe' | 'suggestive' | 'nsfw'
 
@@ -118,8 +115,6 @@ export interface RecentResponse {
   rows: RecentRow[]
 }
 
-export interface SubmitBody { url?: string }
-
 export interface SubmitResult {
   ok: true
   domain?: string
@@ -129,30 +124,3 @@ export interface SubmitResult {
   /** Present only in `NUXT_FIXTURES=1` mode. */
   note?: string
 }
-
-export interface APISchema {
-  '/api/stats': { [Endpoint]: { GET: { response: StatsResponse } } }
-  '/api/hits': {
-    [Endpoint]: { GET: { response: HitsResponse, query: { q?: string } } }
-    [DynamicParam]: { [Endpoint]: { GET: { response: HitDetailResponse } } }
-  }
-  '/api/recent': { [Endpoint]: { GET: { response: RecentResponse } } }
-  '/api/submit': {
-    [Endpoint]: {
-      POST: { body: SubmitBody, response: SubmitResult }
-    }
-  }
-}
-
-/** Response body for a given API path/method. */
-export type APIResponse<
-  Path extends string,
-  Method extends 'GET' | 'POST' = 'GET',
-> = TypedFetchResponseBody<APISchema, Path, Method>
-
-/** Strongly-typed `$fetch` for the dashboard API. */
-export const $apiFetch = <T extends TypedFetchInput<APISchema>>(
-  input: T,
-  init?: TypedFetchRequestInit<APISchema, T>,
-): Promise<TypedFetchResponseBody<APISchema, T>> =>
-  $fetch(input as string, init as object) as Promise<TypedFetchResponseBody<APISchema, T>>

@@ -1,4 +1,4 @@
-import { defineHandler, getRequestIP, HTTPError, readBody } from 'nitro/h3'
+import { createError, defineEventHandler, getRequestIP, readBody } from 'nuxt/server'
 import type { SubmitResult } from '#shared/api'
 import { rateLimit, sweep } from '../utils/rate-limit'
 
@@ -23,7 +23,7 @@ const FIXTURES = !!process.env.NUXT_FIXTURES
 
 const buckets = new Map<string, { count: number, resetAt: number }>()
 
-export default defineHandler(async (event): Promise<SubmitResult> => {
+export default defineEventHandler(async (event): Promise<SubmitResult> => {
   if (FIXTURES) {
     return {
       ok: true,
@@ -47,26 +47,26 @@ export default defineHandler(async (event): Promise<SubmitResult> => {
   event.res.headers.set('x-ratelimit-reset', String(Math.ceil(gate.resetAt / 1000)))
   if (!gate.ok) {
     event.res.headers.set('retry-after', String(Math.ceil((gate.resetAt - Date.now()) / 1000)))
-    throw new HTTPError({ statusCode: 429, statusMessage: 'Too Many Requests', message: 'too many submissions; try again shortly' })
+    throw createError({ status: 429, statusText: 'Too Many Requests', message: 'too many submissions; try again shortly' })
   }
 
   const body = await readBody<SubmitBody>(event).catch(() => null)
   const url = body && typeof body.url === 'string' ? body.url.trim() : ''
-  if (!url) throw new HTTPError({ statusCode: 400, statusMessage: 'Bad Request', message: 'missing url' })
-  if (url.length > 512) throw new HTTPError({ statusCode: 400, statusMessage: 'Bad Request', message: 'url too long' })
+  if (!url) throw createError({ status: 400, statusText: 'Bad Request', message: 'missing url' })
+  if (url.length > 512) throw createError({ status: 400, statusText: 'Bad Request', message: 'url too long' })
 
   // Cheap pre-check so we can fail fast without paying the daemon round-trip on
   // obviously-bad input. The daemon re-runs the full canonical/skip logic via tldts.
   const candidate = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`
   let parsed: URL
   try { parsed = new URL(candidate) }
-  catch { throw new HTTPError({ statusCode: 400, statusMessage: 'Bad Request', message: 'invalid url' }) }
+  catch { throw createError({ status: 400, statusText: 'Bad Request', message: 'invalid url' }) }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new HTTPError({ statusCode: 400, statusMessage: 'Bad Request', message: 'only http(s) urls are supported' })
+    throw createError({ status: 400, statusText: 'Bad Request', message: 'only http(s) urls are supported' })
   }
 
   if (!DAEMON_TOKEN) {
-    throw new HTTPError({ statusCode: 503, statusMessage: 'Service Unavailable', message: 'submit endpoint is not configured' })
+    throw createError({ status: 503, statusText: 'Service Unavailable', message: 'submit endpoint is not configured' })
   }
 
   let daemonRes: Response
@@ -85,7 +85,7 @@ export default defineHandler(async (event): Promise<SubmitResult> => {
   }
   catch (err) {
     console.error('[submit] daemon unreachable', err)
-    throw new HTTPError({ statusCode: 502, statusMessage: 'Bad Gateway', message: 'daemon unreachable' })
+    throw createError({ status: 502, statusText: 'Bad Gateway', message: 'daemon unreachable' })
   }
 
   // Read the body once as text so we can log the raw response on failure. Parse it
@@ -105,7 +105,7 @@ export default defineHandler(async (event): Promise<SubmitResult> => {
       })
     }
     const message = payload?.error || `daemon returned ${daemonRes.status}`
-    throw new HTTPError({ statusCode: daemonRes.status >= 500 ? 502 : 400, statusMessage: 'Submit Failed', message })
+    throw createError({ status: daemonRes.status >= 500 ? 502 : 400, statusText: 'Submit Failed', message })
   }
 
   return {

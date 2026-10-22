@@ -1,5 +1,5 @@
 import { defineCachedHandler } from 'nitro/cache'
-import { getQuery } from 'nitro/h3'
+import { getQuery } from 'nuxt/server'
 import type { RecentResponse } from '#shared/api'
 import { getDb } from '../utils/db'
 

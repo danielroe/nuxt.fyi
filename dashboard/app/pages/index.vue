@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import type { APIResponse } from '#shared/api'
 import { fmtNumber } from '~/composables/format'
 
 definePageMeta({ name: 'index' })
 
 useHead({ title: 'Overview — nuxt.fyi' })
 
-const { data, pending } = await useFetch<APIResponse<'/api/stats'>>('/api/stats', {
+const { data, pending } = await useFetch('/api/stats', {
   lazy: true,
 })
 

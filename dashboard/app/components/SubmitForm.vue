@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
-import { $apiFetch, type SubmitResult } from '#shared/api'
+import type { SubmitResult } from '#shared/api'
 
 const url = ref('')
 const submitting = ref(false)
@@ -24,7 +24,7 @@ async function onSubmit(): Promise<void> {
   result.value = null
   errorMessage.value = null
   try {
-    result.value = await $apiFetch('/api/submit', {
+    result.value = await $fetch('/api/submit', {
       method: 'POST',
       body: { url: normalized },
     })

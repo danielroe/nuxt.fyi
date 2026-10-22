@@ -1,8 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { existsSync } from 'node:fs'
 import { resolve, join } from 'node:path'
-import { useRuntimeConfig } from 'nitro/runtime-config'
-import { HTTPError } from 'nitro/h3'
+import { createError, useRuntimeConfig } from 'nuxt/server'
 
 let cached: DatabaseSync | null = null
 let loggedPath = false
@@ -24,9 +23,9 @@ export function getDb(): DatabaseSync {
     loggedPath = true
   }
   if (!existsSync(path)) {
-    throw new HTTPError({
-      statusCode: 503,
-      statusMessage: 'Service Unavailable',
+    throw createError({
+      status: 503,
+      statusText: 'Service Unavailable',
       message: `daemon database not yet available at ${path}`,
     })
   }

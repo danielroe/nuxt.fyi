@@ -1,6 +1,6 @@
 import type { SQLInputValue } from 'node:sqlite'
 import { defineCachedFunction } from 'nitro/cache'
-import { defineHandler, getQuery } from 'nitro/h3'
+import { defineEventHandler, getQuery } from 'nuxt/server'
 import type { HitsResponse, Signal } from '#shared/api'
 import { sanitizeSearchTerm } from '#shared/utils/search-term'
 import { getDb, type ScanRow } from '../utils/db'
@@ -102,7 +102,7 @@ const queryHitsCached = defineCachedFunction(queryHits, {
     `hits:${page}:${version ?? 'all'}:${sortKey}:${order.toLowerCase()}`,
 })
 
-export default defineHandler((event): HitsResponse | Promise<HitsResponse> => {
+export default defineEventHandler((event): HitsResponse | Promise<HitsResponse> => {
   const query = getQuery(event)
   const page = Math.max(1, Number(query.page) || 1)
   const version = typeof query.version === 'string' ? query.version : null

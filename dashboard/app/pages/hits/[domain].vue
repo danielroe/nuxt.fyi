@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
-import type { APIResponse } from '#shared/api'
 import { fmtNumber } from '~/composables/format'
 
 definePageMeta({ name: 'hits-detail' })
@@ -8,7 +7,7 @@ definePageMeta({ name: 'hits-detail' })
 const route = useRoute('hits-detail')
 const domain = computed(() => route.params.domain as string)
 
-const { data, error, pending } = await useFetch<APIResponse<`/api/hits/${string}`>>(() => `/api/hits/${encodeURIComponent(domain.value)}`, {
+const { data, error, pending } = await useFetch(() => `/api/hits/${encodeURIComponent(domain.value)}`, {
   lazy: true,
 })
 
