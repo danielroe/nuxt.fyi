@@ -19,7 +19,7 @@
     "@nuxt/image": "^2.2.0",
     "defu": "^6.1.7",
     "nitro": "3.0.260903-beta",
-    "nuxt": "npm:nuxt-nightly@5.0.0-2610221052-8c52432",
+    "nuxt": "npm:nuxt-nightly@5.0.0-2610270115-58d7824",
     "vue": "^3.5.0",
     "vue-router": "^5.0.7"
   },
