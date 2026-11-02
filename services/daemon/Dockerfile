@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim AS workspace
+FROM node:26-bookworm-slim AS workspace
 
 WORKDIR /repo
 RUN corepack enable
@@ -27,7 +27,7 @@ COPY dashboard/ ./dashboard/
 RUN pnpm --filter nuxt-fyi-dashboard build
 
 # --- runtime ---
-FROM node:24-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 
 # Daemon image is intentionally lean after the scanner extraction: no Chromium, no
 # extension, no Playwright. The screenshot pipeline lives on the nuxt-fyi-scanner app.

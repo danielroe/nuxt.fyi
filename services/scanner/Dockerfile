@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim AS workspace
+FROM node:26-bookworm-slim AS workspace
 
 WORKDIR /repo
 RUN corepack enable
@@ -24,7 +24,7 @@ COPY services/scanner/ ./services/scanner/
 RUN pnpm --filter @nuxt-fyi/scanner build
 
 # --- runtime ---
-FROM node:24-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 ENV NODE_ENV=production
