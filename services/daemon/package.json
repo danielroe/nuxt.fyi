@@ -23,7 +23,7 @@
     "backfill-nsfw": "node --env-file-if-exists=../../.env scripts/backfill-nsfw.mjs"
   },
   "dependencies": {
-    "@atproto/api": "^0.29.0",
+    "@atproto/api": "^0.31.0",
     "@imagekit/nodejs": "^7.6.2",
     "consola": "^3.4.0",
     "tldts": "^7.0.0"
